@@ -110,6 +110,7 @@
       'st.new': '太新跳过',
 
       'foot.disclaimer': '非官方工具，与叠纸游戏 / 《无限暖暖》官方无关。所有判定只依据本地缓存的比对结果，不读取账号信息。',
+      'foot.oss': '完全开源，MIT 协议。源码公开在 <a class="repo-link" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner" target="_blank" rel="noopener">GitHub</a> 和 <a class="repo-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner" target="_blank" rel="noopener">Gitee</a>，每一行怎么判定的都能自己去核对，也可以拿去改。作者 Lyrins。',
       'foot.tip': '不想下载脚本？<a class="exe-link" href="#">下载桌面版</a>，点一下就把截图挪进待清理文件夹，还能一键还原。',
 
       'notice.first.t': '第一次使用，先建立台账',
@@ -227,6 +228,7 @@
       'st.new': 'Too new',
 
       'foot.disclaimer': 'Unofficial tool, not affiliated with Papergames or Infinity Nikki. Detection relies only on local cache comparison; no account data is read.',
+      'foot.oss': 'Fully open source under the MIT licence. The code lives on <a class="repo-link" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner" target="_blank" rel="noopener">GitHub</a> and <a class="repo-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner" target="_blank" rel="noopener">Gitee</a> — you can audit exactly how a photo gets flagged, or fork it. Built by Lyrins.',
       'foot.tip': 'Prefer no script at all? <a class="exe-link" href="#">Get the desktop app</a> — it moves screenshots into the review folder in one click, and restores them just as fast.',
 
       'notice.first.t': 'First run — building the ledger',

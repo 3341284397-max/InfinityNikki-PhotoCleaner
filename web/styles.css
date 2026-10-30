@@ -461,6 +461,17 @@ main {
 .exe-link:hover { color: var(--green-dark); text-decoration-color: currentColor; }
 .foot .exe-link { color: var(--green-deep); }
 .fallback .exe-link { color: #99604F; font-weight: 650; }
+/* 页脚「源码在 GitHub / Gitee」那两个链接。跟 .exe-link 一个色系，
+   但它是「去看代码」而不是「去下载」，不带下载条那套权重 */
+.repo-link {
+  color: var(--green-deep);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(78, 132, 103, .45);
+}
+.repo-link:hover { color: var(--green-dark); text-decoration-color: currentColor; }
 
 .privacy {
   position: relative;
