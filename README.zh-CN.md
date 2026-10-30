@@ -6,7 +6,9 @@
 
 简体中文 | [English](README.md)
 
-**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1)**　·　[下载 exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest)　·　网页版不装任何东西，选文件夹就能用。
+**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
+
+没有游戏目录？[直接看演示](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1)，用的是生成的样例照片。
 
 ![主界面](docs/screenshots/main-zh.png)
 

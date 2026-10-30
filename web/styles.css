@@ -363,6 +363,65 @@ main {
   line-height: 1.7;
 }
 
+/* 主界面上的桌面版下载条。做成整行可点，比一个孤零零的「下载」按钮更容易被看见，
+   又不会跟主按钮「选择文件夹」抢注意力 */
+.exe-offer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--sh-xs);
+  text-decoration: none;
+  transition: border-color .18s var(--ease), background .18s var(--ease), box-shadow .18s var(--ease);
+}
+.exe-offer:hover {
+  border-color: var(--green-line);
+  background: var(--green-soft);
+  box-shadow: var(--sh);
+}
+.exe-offer-ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-line);
+  color: var(--green-deep);
+}
+.exe-offer:hover .exe-offer-ico { background: var(--card); }
+.exe-offer-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.exe-offer-body b { font-size: 13.2px; font-weight: 650; color: var(--text); letter-spacing: .1px; }
+.exe-offer-body span { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+.exe-offer-act {
+  flex: none;
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--green-deep);
+  white-space: nowrap;
+}
+
+/* 正文里的桌面版链接（页脚那句提示、不支持浏览器的兜底卡片）。
+   颜色跟随所在段落，只加下划线，别喧宾夺主 */
+.exe-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(78, 132, 103, .45);
+}
+.exe-link:hover { color: var(--green-dark); text-decoration-color: currentColor; }
+.foot .exe-link { color: var(--green-deep); }
+.fallback .exe-link { color: #99604F; font-weight: 650; }
+
 .privacy {
   position: relative;
   display: inline-flex;
@@ -1046,6 +1105,9 @@ body.is-busy .btn { pointer-events: none; }
   .pathfield-row { flex-wrap: wrap; }
   .pathfield-row input { flex-basis: 100%; }
   .pathfield-row .btn { margin-left: auto; }
+  /* 下载条：窄屏下让说明文字自己折行，「下载 exe」始终跟图标同一行，不另起一层 */
+  .exe-offer { gap: 10px; padding: 10px 12px; }
+  .exe-offer-body { flex: 1 1 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -12,6 +12,12 @@
   var LANG_KEY = 'nikki.lang.v1';
   var THUMB_W = 460;
 
+  /* 桌面版直链。用 releases/latest/download/<资产名> 而不是 /releases/latest：
+     前者 302 到当前版本的真实资产、浏览器直接开始下载，后者只是发行版说明页。
+     文案里的 <a class="exe-link"> 统一由 relinkExe() 补上这个地址；
+     换地址时 index.html 里那三处写死的 href 也要一起改（没有 JS 时靠它们）。 */
+  var EXE_URL = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
+
   /* ---------------- 文案 ---------------- */
   var I18N = {
     zh: {
@@ -34,10 +40,13 @@
       'demo.sample': '示意',
       'intro.pickNote': '首次使用会从这里建立一份「相册台账」，之后才能判断哪些是你在游戏里删掉的',
       'intro.privacy': '没有服务器、没有上传、没有统计。断网也能用。',
+      'intro.exeT': '想要一键移动、一键还原？用桌面版',
+      'intro.exeD': 'Windows 免安装单文件，点一下就把截图挪进待清理文件夹',
+      'intro.exeGo': '下载 exe',
 
       'fallback.t': '这个浏览器暂时用不了',
       'fallback.d': '读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。',
-      'fallback.alt': '也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。',
+      'fallback.alt': '也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。<a class="exe-link" href="#">下载 Windows 版</a>',
 
       'ws.home': '返回',
       'ws.homeTip': '回到首页，重新选文件夹',
@@ -89,7 +98,7 @@
       'st.new': '太新跳过',
 
       'foot.disclaimer': '非官方工具，与叠纸游戏 / 《无限暖暖》官方无关。所有判定只依据本地缓存的比对结果，不读取账号信息。',
-      'foot.tip': '不想下载脚本？桌面版点一下就把截图挪进待清理文件夹，还能一键还原。',
+      'foot.tip': '不想下载脚本？<a class="exe-link" href="#">下载桌面版</a>，点一下就把截图挪进待清理文件夹，还能一键还原。',
 
       'notice.first.t': '第一次使用，先建立台账',
       'notice.first.b': '这次只能记录「哪些截图曾经在相册里」，还判断不出谁被删了。在游戏里删几张照片后回到这里重新扫描，就能看到「游戏里已删」。',
@@ -145,10 +154,13 @@
       'demo.sample': 'Sample',
       'intro.pickNote': 'The first run builds a local "album ledger". Only after that can it tell which screenshots you deleted in game.',
       'intro.privacy': 'No server, no upload, no tracking. Works offline.',
+      'intro.exeT': 'Want one-click move and one-click restore? Use the desktop app',
+      'intro.exeD': 'A single portable Windows exe — it moves the screenshots into the review folder for you',
+      'intro.exeGo': 'Download exe',
 
       'fallback.t': 'This browser cannot do it yet',
       'fallback.d': 'Reading a local folder needs <b>desktop Chrome or Edge (86+)</b>. Firefox, Safari and mobile browsers do not support it.',
-      'fallback.alt': 'You can also use the desktop app: same detection, plus it moves the files into a review folder so you can delete them in one go.',
+      'fallback.alt': 'You can also use the desktop app: same detection, plus it moves the files into a review folder so you can delete them in one go. <a class="exe-link" href="#">Download the Windows build</a>',
 
       'ws.home': 'Home',
       'ws.homeTip': 'Back to the start page and pick another folder',
@@ -200,7 +212,7 @@
       'st.new': 'Too new',
 
       'foot.disclaimer': 'Unofficial tool, not affiliated with Papergames or Infinity Nikki. Detection relies only on local cache comparison; no account data is read.',
-      'foot.tip': 'Prefer no script at all? The desktop app moves screenshots into the review folder in one click, and restores them just as fast.',
+      'foot.tip': 'Prefer no script at all? <a class="exe-link" href="#">Get the desktop app</a> — it moves screenshots into the review folder in one click, and restores them just as fast.',
 
       'notice.first.t': 'First run — building the ledger',
       'notice.first.b': 'This pass only records which screenshots were in the album. Delete a few photos in game, come back and rescan, and they will show up as "Deleted in game".',
@@ -321,6 +333,12 @@
   }
 
   /* ---------------- 语言 ---------------- */
+  /* 文案里的 <a class="exe-link" href="#"> 只是占位，真正的下载地址统一在这里补。
+     放在 applyLang 里调，因为 innerHTML 一换，原来的 <a> 节点就没了。 */
+  function relinkExe() {
+    document.querySelectorAll('a.exe-link, a.exe-offer').forEach(function (a) { a.href = EXE_URL; });
+  }
+
   function applyLang() {
     document.documentElement.lang = state.lang === 'en' ? 'en' : 'zh-CN';
     document.title = t('app.title');
@@ -339,6 +357,8 @@
     document.querySelectorAll('[data-i18n-title]').forEach(function (node) {
       node.setAttribute('title', t(node.getAttribute('data-i18n-title')));
     });
+
+    relinkExe();
 
     el.btnLang.textContent = state.lang === 'en' ? '中文' : 'EN';
 

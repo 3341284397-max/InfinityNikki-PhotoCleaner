@@ -6,7 +6,9 @@ Finds the photos you already **deleted inside the game but which are still sitti
 
 English | [简体中文](README.zh-CN.md)
 
-**[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1)**　·　[Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest)　·　the web version installs nothing — pick a folder and go.
+**[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
+
+No game folder handy? [Open the demo](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1) — it runs on generated sample photos.
 
 ![Main window](docs/screenshots/main-en.png)
 
