@@ -12,9 +12,14 @@
 - 新增 `src/pack/build.py`：一条命令生成「网盘分享包」（exe + GBK 使用说明 + 截图
   + 零依赖版），供百度网盘等国内网盘上传用
 
+- Gitee 发行版说明顶部加了「下载（三选一）」：Gitee 直链 / GitHub / 百度网盘
+  （<https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w>，提取码 `1111`），
+  网盘那个是完整分享包，包含使用说明、截图和 exe 被拦时能用的零依赖版
+
 ### 文档
 - README（中英）顶部链接与末尾「源码与反馈」都补了 Gitee 镜像入口；
-  中文版「下载 exe」默认改走 Gitee，英文版保留 GitHub、另起一行给 Gitee
+  中文版「下载 exe」默认改走 Gitee，英文版保留 GitHub、另起一行给 Gitee；
+  两边都加了百度网盘整包链接
 
 ## 2026-10-30 · 网页与文档（exe 未变，仍为 1.6.0）
 

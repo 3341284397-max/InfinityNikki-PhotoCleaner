@@ -10,6 +10,8 @@ English | [简体中文](README.zh-CN.md)
 
 **In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe) (direct link, no login needed).
 
+A third option: [Baidu Wangpan](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) — code `1111`. It holds the full bundle (exe + Chinese readme + screenshots + the dependency-free fallback), which is the one to use when neither code host is reachable.
+
 No game folder handy? [Open the demo](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1) — it runs on generated sample photos.
 
 ![Main window](docs/screenshots/main-en.png)

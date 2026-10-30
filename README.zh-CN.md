@@ -8,6 +8,8 @@
 
 **[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
 
+**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
+
 **GitHub 打不开或太慢？** 仓库在 Gitee 有一份国内镜像：[gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner)，exe 直链下载无需登录。两个仓库内容一致，issue 提在哪边都会看。
 
 没有游戏目录？[直接看演示](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1)，用的是生成的样例照片。
