@@ -6,7 +6,9 @@
 
 简体中文 | [English](README.md)
 
-**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
+**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
+
+**GitHub 打不开或太慢？** 仓库在 Gitee 有一份国内镜像：[gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner)，exe 直链下载无需登录。两个仓库内容一致，issue 提在哪边都会看。
 
 没有游戏目录？[直接看演示](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1)，用的是生成的样例照片。
 
@@ -239,7 +241,7 @@ cd src/test && ./run-tests.sh
 
 ## 许可
 
-源码与问题反馈：<https://github.com/3341284397-max/InfinityNikki-PhotoCleaner>
+源码与问题反馈：<https://github.com/3341284397-max/InfinityNikki-PhotoCleaner>（国内镜像：[Gitee](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner)）
 
 代码以 [MIT](LICENSE) 发布。程序图标（`src/app/app.ico`：大喵拿着扫帚扫照片）
 由 Lyrins 制作，同样以 MIT 许可发布。

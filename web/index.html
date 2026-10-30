@@ -72,10 +72,11 @@
         <p class="cta-note" id="pickNote" data-i18n="intro.pickNote">首次使用会从这里建立一份「相册台账」，之后才能判断哪些是你在游戏里删掉的</p>
       </div>
 
-      <!-- 桌面版下载：主界面直接给入口，不用先绕去 GitHub 的 releases 页。
-           链接是 releases/latest/download/<资产名> 的直链，发版时只改资产名不用动这里。 -->
-      <a class="exe-offer"
-         href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">
+      <!-- 桌面版下载：主界面直接给入口，不用先绕去仓库的 releases 页。
+           两个地址都是 <主机>/<拥有者>/<仓库>/releases/latest/download/<资产名> 这种直链：
+           GitHub 和 Gitee 都支持 302 到当前版本的真实资产、浏览器直接开始下载，
+           发版时只要资产名不变就不用改这里。 -->
+      <div class="exe-offer">
         <span class="exe-offer-ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 4v10"/><path d="m7.5 11 4.5 4.5L16.5 11"/><path d="M4.5 18.5h15"/>
@@ -85,8 +86,11 @@
           <b data-i18n="intro.exeT">想要一键移动、一键还原？用桌面版</b>
           <span data-i18n="intro.exeD">Windows 免安装单文件，点一下就把截图挪进待清理文件夹</span>
         </span>
-        <span class="exe-offer-act" data-i18n="intro.exeGo">下载 exe</span>
-      </a>
+        <span class="exe-offer-act">
+          <a class="exe-btn" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe" data-i18n="intro.exeGo">下载 exe</a>
+          <a class="exe-btn-sub" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe" data-i18n="intro.exeGh">GitHub 备用</a>
+        </span>
+      </div>
 
       <div class="privacy">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -104,7 +108,7 @@
         读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。
       </p>
       <p class="fallback-alt" data-i18n="fallback.alt">
-        也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。<a class="exe-link" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">下载 Windows 版</a>
+        也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。<a class="exe-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">下载 Windows 版</a>
       </p>
     </div>
   </section>
@@ -194,7 +198,7 @@
     非官方工具，与叠纸游戏 / 《无限暖暖》官方无关。所有判定只依据本地缓存的比对结果，不读取账号信息。
   </p>
   <p class="foot-dim" data-i18n="foot.tip">
-    不想下载脚本？<a class="exe-link" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">下载桌面版</a>，点一下就把截图挪进待清理文件夹，还能一键还原。
+    不想下载脚本？<a class="exe-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">下载桌面版</a>，点一下就把截图挪进待清理文件夹，还能一键还原。
   </p>
 </footer>
 

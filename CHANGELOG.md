@@ -1,5 +1,21 @@
 # 更新日志
 
+## 2026-10-30 · Gitee 镜像上线（exe 未变，仍为 1.6.0）
+
+### 新增
+- **Gitee 国内镜像**：<https://gitee.com/lyrins/InfinityNikki-PhotoCleaner>，代码与 GitHub 完全一致，
+  发行版带 exe 附件，直链下载无需登录。GitHub 和 Gitee 都支持
+  `releases/latest/download/<资产名>` 这种写法（连 `latest` 别名都通用），
+  所以发新版时两边都不用改链接，只要资产名还叫 `NikkiPhotoCleaner.exe`
+- 网页首页下载条改成两个入口：**「下载 exe」走 Gitee 国内直连**（默认），
+  下面一行小字「GitHub 备用」；页脚与兜底卡片里的「桌面版」链接同样指向 Gitee
+- 新增 `src/pack/build.py`：一条命令生成「网盘分享包」（exe + GBK 使用说明 + 截图
+  + 零依赖版），供百度网盘等国内网盘上传用
+
+### 文档
+- README（中英）顶部链接与末尾「源码与反馈」都补了 Gitee 镜像入口；
+  中文版「下载 exe」默认改走 Gitee，英文版保留 GitHub、另起一行给 Gitee
+
 ## 2026-10-30 · 网页与文档（exe 未变，仍为 1.6.0）
 
 ### 网页

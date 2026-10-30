@@ -14,9 +14,13 @@
 
   /* 桌面版直链。用 releases/latest/download/<资产名> 而不是 /releases/latest：
      前者 302 到当前版本的真实资产、浏览器直接开始下载，后者只是发行版说明页。
-     文案里的 <a class="exe-link"> 统一由 relinkExe() 补上这个地址；
-     换地址时 index.html 里那三处写死的 href 也要一起改（没有 JS 时靠它们）。 */
-  var EXE_URL = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
+     GitHub 和 Gitee 都认这个写法，连 latest 这个别名都支持，所以发新版不用改地址，
+     只要求两边发行版的资产名都叫 NikkiPhotoCleaner.exe。
+     国内 CDN 走 Gitee，GitHub 当备用。
+     文案里的 <a class="exe-link"> 统一由 relinkExe() 补地址；index.html 里写死的
+     href 则是没有 JS 时的兜底，改地址时两边都要动。 */
+  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
+  var EXE_URL_ALT = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
 
   /* ---------------- 文案 ---------------- */
   var I18N = {
@@ -43,6 +47,7 @@
       'intro.exeT': '想要一键移动、一键还原？用桌面版',
       'intro.exeD': 'Windows 免安装单文件，点一下就把截图挪进待清理文件夹',
       'intro.exeGo': '下载 exe',
+      'intro.exeGh': 'GitHub 备用',
 
       'fallback.t': '这个浏览器暂时用不了',
       'fallback.d': '读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。',
@@ -157,6 +162,7 @@
       'intro.exeT': 'Want one-click move and one-click restore? Use the desktop app',
       'intro.exeD': 'A single portable Windows exe — it moves the screenshots into the review folder for you',
       'intro.exeGo': 'Download exe',
+      'intro.exeGh': 'GitHub mirror',
 
       'fallback.t': 'This browser cannot do it yet',
       'fallback.d': 'Reading a local folder needs <b>desktop Chrome or Edge (86+)</b>. Firefox, Safari and mobile browsers do not support it.',
@@ -335,8 +341,10 @@
   /* ---------------- 语言 ---------------- */
   /* 文案里的 <a class="exe-link" href="#"> 只是占位，真正的下载地址统一在这里补。
      放在 applyLang 里调，因为 innerHTML 一换，原来的 <a> 节点就没了。 */
+  /* i18n 一换文案，原来那些 <a> 节点就被重建了，href 得重新补 */
   function relinkExe() {
-    document.querySelectorAll('a.exe-link, a.exe-offer').forEach(function (a) { a.href = EXE_URL; });
+    document.querySelectorAll('a.exe-link, a.exe-btn').forEach(function (a) { a.href = EXE_URL; });
+    document.querySelectorAll('a.exe-btn-sub').forEach(function (a) { a.href = EXE_URL_ALT; });
   }
 
   function applyLang() {

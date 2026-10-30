@@ -8,6 +8,8 @@ English | [简体中文](README.zh-CN.md)
 
 **[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
 
+**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe) (direct link, no login needed).
+
 No game folder handy? [Open the demo](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/?demo=1) — it runs on generated sample photos.
 
 ![Main window](docs/screenshots/main-en.png)
@@ -244,7 +246,7 @@ and that switching language never splits the data folder (cases 12 and 13).
 
 ## License
 
-Source and issue tracker: <https://github.com/3341284397-max/InfinityNikki-PhotoCleaner>
+Source and issue tracker: <https://github.com/3341284397-max/InfinityNikki-PhotoCleaner> (mirror: [Gitee](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner))
 
 Code is released under [MIT](LICENSE). The application icon (`src/app/app.ico` — Damiao sweeping up
 photos) was made by Lyrins and is released under the same MIT license.
