@@ -192,6 +192,8 @@ cd src/test && ./run-tests.sh
 
 ## 许可
 
+源码与问题反馈：<https://github.com/3341284397-max/InfinityNikki-PhotoCleaner>
+
 代码以 [MIT](LICENSE) 发布。程序图标（`src/app/app.ico`：大喵拿着扫帚扫照片）
 由本项目作者制作，同样以 MIT 许可发布。
 

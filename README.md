@@ -186,6 +186,8 @@ and that switching language never splits the data folder (cases 12 and 13).
 
 ## License
 
+Source and issue tracker: <https://github.com/3341284397-max/InfinityNikki-PhotoCleaner>
+
 Code is released under [MIT](LICENSE). The application icon (`src/app/app.ico` — Damiao sweeping up
 photos) was made by the project author and is released under the same MIT license.
 
