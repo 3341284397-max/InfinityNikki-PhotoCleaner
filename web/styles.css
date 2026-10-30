@@ -774,6 +774,102 @@ body.has-action { padding-bottom: 84px; }
 }
 .modal-info { margin-left: auto; }
 
+/* ============ 下载脚本对话框 ============ */
+.sheet {
+  position: relative;
+  width: min(560px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--card);
+  border-radius: var(--r-lg);
+  padding: 26px 26px 20px;
+  box-shadow: var(--sh-lg);
+  animation: pop .26s var(--ease) both;
+}
+.sheet h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.sheet-lede {
+  margin: 0 0 14px;
+  font-size: 13.4px;
+  line-height: 1.72;
+  color: var(--text-2);
+}
+.sheet-lede b { color: var(--green-deep); font-weight: 600; }
+.sheet-steps {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  font-size: 13.2px;
+  line-height: 1.86;
+  color: var(--text-2);
+}
+.sheet-steps li { margin-bottom: 4px; }
+.sheet-steps code,
+.sheet-lede code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--bg-warm);
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 12.2px;
+  color: var(--text);
+}
+.sheet-more {
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card-warm);
+  overflow: hidden;
+}
+.sheet-more summary {
+  padding: 9px 12px;
+  font-size: 12.6px;
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.sheet-more summary::-webkit-details-marker { display: none; }
+.sheet-more summary::before {
+  content: "▸ ";
+  color: var(--text-3);
+}
+.sheet-more[open] summary::before { content: "▾ "; }
+.sheet-more summary:hover { color: var(--green-deep); }
+.sheet-more pre {
+  margin: 0;
+  padding: 0 12px 12px;
+  max-height: 220px;
+  /* 底部渐隐：提示这里还能往下滚，不至于让半行字硬生生切一刀 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+  overflow: auto;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 11.4px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+.sheet-note {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-line);
+  font-size: 12.4px;
+  line-height: 1.72;
+  color: var(--green-dark);
+}
+.sheet-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* ============ 轻提示 ============ */
 .toast {
   position: fixed;

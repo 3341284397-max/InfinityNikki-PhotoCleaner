@@ -26,8 +26,8 @@
       'intro.s1d': '选中 <code>X6Game</code> 这一层，浏览器会向你请求读取权限',
       'intro.s2t': '自动比对',
       'intro.s2d': '把本地截图和相册缓存对一遍，标出游戏里已删除的那些',
-      'intro.s3t': '导出清单，自己删',
-      'intro.s3d': '按文件名逐张核对，导出待删清单后在资源管理器里处理',
+      'intro.s3t': '一键移进待清理文件夹',
+      'intro.s3d': '勾好之后下载一个小脚本，双击就把它们挪到一边，删不删还是你说了算',
       'intro.pick': '选择 X6Game 文件夹',
       'intro.demo': '还没有游戏目录？先看演示',
       'demo.badge': '演示数据',
@@ -50,6 +50,20 @@
       'ws.selected': '张已勾选',
       'ws.copy': '复制文件名',
       'ws.export': '导出待删清单',
+      'ws.script': '下载清理脚本',
+
+      'dlg.title': '下载清理脚本',
+      'dlg.lede': '生成一个双击就能用的 .bat：自动新建「待清理照片」文件夹，把勾选的 <b>{0}</b> 张移进去。',
+      'dlg.s1': '把下载好的脚本<b>拖进</b> <code>X6Game\\ScreenShot</code> 文件夹 —— 挨着截图放，它自己就知道路径',
+      'dlg.s2': '双击运行。没放进 ScreenShot 也没关系，窗口会让你把文件夹拖进去',
+      'dlg.s3': '跑完它会问要不要删掉这个一次性脚本，选 Y 就消失',
+      'dlg.peek': '先看看脚本长什么样',
+      'dlg.note': '脚本是纯文本批处理，右键 → 用记事本就能逐行核对，它只移动、不删除任何照片。首次运行 Windows 可能弹一次「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」就好。',
+      'dlg.cancel': '取消',
+      'dlg.download': '下载脚本',
+      'dlg.more': '… 后面还有 {0} 行，格式和上面一样',
+      'act.scripted': '脚本已下载 —— 拖进 ScreenShot 文件夹再双击',
+      'act.noScript': '脚本组件没加载出来，刷新页面再试',
 
       'st.keep': '仍在相册',
       'st.del': '游戏里已删',
@@ -57,7 +71,7 @@
       'st.new': '太新跳过',
 
       'foot.disclaimer': '非官方工具，与叠纸游戏 / 《无限暖暖》官方无关。所有判定只依据本地缓存的比对结果，不读取账号信息。',
-      'foot.tip': '想连「移动文件」也自动化？桌面版还支持把截图移进待清理文件夹、一键还原。',
+      'foot.tip': '不想下载脚本？桌面版点一下就把截图挪进待清理文件夹，还能一键还原。',
 
       'notice.first.t': '第一次使用，先建立台账',
       'notice.first.b': '这次只能记录「哪些截图曾经在相册里」，还判断不出谁被删了。在游戏里删几张照片后回到这里重新扫描，就能看到「游戏里已删」。',
@@ -105,8 +119,8 @@
       'intro.s1d': 'Select the <code>X6Game</code> folder; the browser will ask for read permission',
       'intro.s2t': 'Compare automatically',
       'intro.s2d': 'Local screenshots are matched against the album cache, highlighting the ones you deleted',
-      'intro.s3t': 'Export the list, delete yourself',
-      'intro.s3d': 'Check them one by one, export the list, then remove them in Explorer',
+      'intro.s3t': 'Move them aside in one go',
+      'intro.s3d': 'Tick what you want, download a small script, double-click it and they are moved aside - deleting stays your call',
       'intro.pick': 'Select the X6Game folder',
       'intro.demo': 'No game folder handy? See the demo',
       'demo.badge': 'Demo data',
@@ -129,6 +143,20 @@
       'ws.selected': 'selected',
       'ws.copy': 'Copy file names',
       'ws.export': 'Export list',
+      'ws.script': 'Download cleanup script',
+
+      'dlg.title': 'Download the cleanup script',
+      'dlg.lede': 'Builds a double-clickable .bat that creates the review folder and moves the <b>{0}</b> selected photos into it.',
+      'dlg.s1': '<b>Drop the script into</b> <code>X6Game\\ScreenShot</code> — next to the photos, it can find the path itself',
+      'dlg.s2': 'Double-click it. If it is not in ScreenShot, the window will ask you to drag the folder in',
+      'dlg.s3': 'When done it asks whether to delete this one-time script — answer Y and it is gone',
+      'dlg.peek': 'Preview the script first',
+      'dlg.note': 'The script is a plain-text batch file: right-click → open in Notepad to read every line. It only moves files, never deletes photos. Windows may show "Windows protected your PC" once — click "More info → Run anyway".',
+      'dlg.cancel': 'Cancel',
+      'dlg.download': 'Download script',
+      'dlg.more': '... {0} more lines, all the same shape',
+      'act.scripted': 'Script downloaded — drop it into ScreenShot and double-click',
+      'act.noScript': 'The script module did not load — reload the page',
 
       'st.keep': 'In album',
       'st.del': 'Deleted in game',
@@ -136,7 +164,7 @@
       'st.new': 'Too new',
 
       'foot.disclaimer': 'Unofficial tool, not affiliated with Papergames or Infinity Nikki. Detection relies only on local cache comparison; no account data is read.',
-      'foot.tip': 'Want the moving automated too? The desktop app also moves screenshots into a review folder and can restore them in one click.',
+      'foot.tip': 'Prefer no script at all? The desktop app moves screenshots into the review folder in one click, and restores them just as fast.',
 
       'notice.first.t': 'First run — building the ledger',
       'notice.first.b': 'This pass only records which screenshots were in the album. Delete a few photos in game, come back and rescan, and they will show up as "Deleted in game".',
@@ -275,6 +303,8 @@
     el.btnLang.textContent = state.lang === 'en' ? '中文' : 'EN';
 
     if (state.items.length) { render(); updateNotice(); }
+    // 对话框里的正文是脚本生成时写死的，切语言就收起来，免得中英混在一张卡片里
+    if (el.dlgScript && !el.dlgScript.hidden) closeScriptDialog();
   }
 
   function toggleLang() {
@@ -641,6 +671,53 @@
     toast(tf('act.exported', list.length));
   }
 
+  /* ---------------- 下载清理脚本 ----------------
+     浏览器碰不到「移动文件」这件事，所以把要移的名单编成一个 .bat，
+     让 Windows 自己去新建文件夹、移动照片。生成逻辑在 script-gen.js。 */
+  var scriptReady = null;
+  var PREVIEW_LINES = 24;
+
+  function buildPreview(text) {
+    var lines = text.split('\r\n');
+    if (lines.length <= PREVIEW_LINES) return lines.join('\n');
+    return lines.slice(0, PREVIEW_LINES).join('\n') + '\n' +
+      tf('dlg.more', lines.length - PREVIEW_LINES);
+  }
+
+  function openScriptDialog() {
+    var list = selectedItems();
+    if (!list.length) { toast(t('act.nothing')); return; }
+    if (!window.NikkiScript) { toast(t('act.noScript'), 'bad'); return; }
+
+    scriptReady = window.NikkiScript.build(state.lang, list.map(function (i) { return i.name; }));
+    el.dlgLede.innerHTML = tf('dlg.lede', list.length);
+    el.dlgPre.textContent = buildPreview(scriptReady.text);
+    el.dlgScript.hidden = false;
+    document.body.style.overflow = 'hidden';
+    el.dlgGo.focus();
+  }
+
+  function closeScriptDialog() {
+    el.dlgScript.hidden = true;
+    document.body.style.overflow = '';
+    scriptReady = null;
+  }
+
+  function downloadScript() {
+    if (!scriptReady) return;
+    var blob = new Blob([scriptReady.bytes], { type: 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = scriptReady.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast(t('act.scripted'));
+    closeScriptDialog();
+  }
+
   /* ---------------- 演示模式 ----------------
      审核者、或只是想先看看效果的人，不必准备游戏目录也能走完整流程。
      全部用 canvas 现画的示意图，不涉及任何游戏内素材。            */
@@ -825,6 +902,13 @@
       selCount: document.getElementById('selCount'),
       btnCopy: document.getElementById('btnCopy'),
       btnExport: document.getElementById('btnExport'),
+      btnScript: document.getElementById('btnScript'),
+      dlgScript: document.getElementById('dlgScript'),
+      dlgMask: document.getElementById('dlgMask'),
+      dlgLede: document.getElementById('dlgLede'),
+      dlgPre: document.getElementById('dlgPre'),
+      dlgCancel: document.getElementById('dlgCancel'),
+      dlgGo: document.getElementById('dlgGo'),
       modal: document.getElementById('modal'),
       modalImg: document.getElementById('modalImg'),
       modalBadge: document.getElementById('modalBadge'),
@@ -888,11 +972,17 @@
 
     el.btnCopy.addEventListener('click', copyNames);
     el.btnExport.addEventListener('click', exportCsv);
+    el.btnScript.addEventListener('click', openScriptDialog);
+    el.dlgCancel.addEventListener('click', closeScriptDialog);
+    el.dlgMask.addEventListener('click', closeScriptDialog);
+    el.dlgGo.addEventListener('click', downloadScript);
 
     el.modalClose.addEventListener('click', closeModal);
     el.modalMask.addEventListener('click', closeModal);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !el.modal.hidden) closeModal();
+      if (e.key !== 'Escape') return;
+      if (!el.modal.hidden) closeModal();
+      else if (!el.dlgScript.hidden) closeScriptDialog();
     });
 
     // ?demo=1 直接进入演示：方便截图、也方便没装游戏的人一眼看到效果

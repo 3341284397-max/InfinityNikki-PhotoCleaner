@@ -161,7 +161,8 @@
   </div>
   <div class="actionbar-btns">
     <button class="btn btn-ghost" id="btnCopy" data-i18n="ws.copy">复制文件名</button>
-    <button class="btn btn-primary" id="btnExport" data-i18n="ws.export">导出待删清单</button>
+    <button class="btn btn-ghost" id="btnExport" data-i18n="ws.export">导出待删清单</button>
+    <button class="btn btn-primary" id="btnScript" data-i18n="ws.script">下载清理脚本</button>
   </div>
 </div>
 
@@ -188,6 +189,30 @@
   </div>
 </div>
 
+<!-- ===== 下载清理脚本 ===== -->
+<div class="modal" id="dlgScript" hidden>
+  <div class="modal-mask" id="dlgMask"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h3 id="dlgTitle" data-i18n="dlg.title">下载清理脚本</h3>
+    <p class="sheet-lede" id="dlgLede"></p>
+    <ol class="sheet-steps">
+      <li data-i18n="dlg.s1">把下载好的脚本拖进 ScreenShot 文件夹</li>
+      <li data-i18n="dlg.s2">双击运行</li>
+      <li data-i18n="dlg.s3">跑完问你要不要删掉它</li>
+    </ol>
+    <details class="sheet-more">
+      <summary data-i18n="dlg.peek">先看看脚本长什么样</summary>
+      <pre id="dlgPre"></pre>
+    </details>
+    <p class="sheet-note" data-i18n="dlg.note">脚本是纯文本。</p>
+    <div class="sheet-btns">
+      <button class="btn btn-ghost" id="dlgCancel" data-i18n="dlg.cancel">取消</button>
+      <button class="btn btn-primary" id="dlgGo" data-i18n="dlg.download">下载脚本</button>
+    </div>
+  </div>
+</div>
+
+<script src="script-gen.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
