@@ -99,10 +99,40 @@ Four double-click `.bat` launchers live in `package/`: scan, move, restore, and 
 ### 3. Web
 
 Open `web/index.html` in Chrome or Edge and pick the folder.
-Because of browser sandboxing the web version **only identifies and exports a list — it cannot move files**.
 No game folder? Click *See a demo first*, or open with `?demo=1`.
 
 ![Web version](docs/screenshots/web-en.png)
+
+Browsers are not allowed to move local files from a page, so the web version hands
+that one step back to you. Tick the photos, press *Download cleanup script*, and you
+get a small `.bat`. Drop it into `X6Game\ScreenShot` and double-click it.
+
+The script does exactly three things, all of them readable:
+
+1. Creates a `无限暖暖清理助手_待清理照片` folder
+2. **Moves** the listed photos into it (name clashes get `_1`, nothing is overwritten)
+3. Asks whether to delete itself — answering `Y` removes the script
+
+It never deletes a photo, and nothing is hidden behind `certutil` — open it in Notepad
+and read every line. Deleting the photos stays your job, in Explorer, by hand.
+
+![Downloading the script](docs/screenshots/web-script-en.png)
+
+A few details:
+
+- The script first looks for one of the listed photos next to itself, then in a
+  `ScreenShot\` subfolder. Only if neither works does it ask you to drag the folder in
+- Photos that are already gone count as *skipped*, not failed. If nothing moves, no
+  empty folder is left behind
+- The Chinese script is written as **GBK**. `cmd` reads a batch file byte by byte in the
+  console code page, so a UTF-8 Chinese batch file misparses lines — in testing it ran
+  the "delete yourself?" prompt as a command
+- SmartScreen may block it once on first run. Choose *More info → Run anyway*. That is
+  the standard greeting for any downloaded `.bat`, not a sign of a broken script
+
+> If you would rather move files with a single click, use the exe — it moves locally and
+> can restore in one click. The web version's value is installing nothing at all, and
+> never tripping Smart App Control on an unsigned binary.
 
 ---
 
@@ -181,7 +211,9 @@ and that switching language never splits the data folder (cases 12 and 13).
 - Detection relies on the game's album cache layout (`Saved/GamePlayPhotos/*/NikkiPhotos_*`).
   A major game update that changes that layout would require adjusting the scanner
 - Matching is by file name. If the game renames a file, it will show up as "Unsure"
-- The web version cannot move files, only export a list
+- The web version itself cannot move files (browser sandbox). It downloads a one-time
+  script you run locally; that script has no undo, so use the exe or PowerShell version
+  if you want restore
 - Only verified on Windows
 
 ## License
