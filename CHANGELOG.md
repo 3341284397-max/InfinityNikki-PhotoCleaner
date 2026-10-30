@@ -1,12 +1,19 @@
 # 更新日志
 
+## 2026-10-30 · 修复 Gitee 直链 404（exe 未变，仍为 1.6.0）
+
+### 修复
+- **Gitee 的 `releases/latest/download/<资产名>` 直链其实不可靠**：它的 `latest` 会被当成
+  分支名，302 到 `repository/archive/latest/...` 源码归档路径，而仓库分支叫 `master`，于是 404。
+  GitHub 的 `latest` 别名才是真正的语义（302 到当前版本资产）。所有 Gitee 直链已改成写死
+  tag 的 `releases/download/v1.6.0/<资产名>`，实测下载哈希与本地 exe 一致。
+  **代价**：Gitee 这条发新版时 tag 要跟着改；GitHub 那条保留 `latest`，不用动
+
 ## 2026-10-30 · Gitee 镜像上线（exe 未变，仍为 1.6.0）
 
 ### 新增
 - **Gitee 国内镜像**：<https://gitee.com/lyrins/InfinityNikki-PhotoCleaner>，代码与 GitHub 完全一致，
-  发行版带 exe 附件，直链下载无需登录。GitHub 和 Gitee 都支持
-  `releases/latest/download/<资产名>` 这种写法（连 `latest` 别名都通用），
-  所以发新版时两边都不用改链接，只要资产名还叫 `NikkiPhotoCleaner.exe`
+  发行版带 exe 附件，直链下载无需登录
 - 网页首页下载条改成两个入口：**「下载 exe」走 Gitee 国内直连**（默认），
   下面一行小字「GitHub 备用」；页脚与兜底卡片里的「桌面版」链接同样指向 Gitee
 - 新增 `src/pack/build.py`：一条命令生成「网盘分享包」（exe + GBK 使用说明 + 截图

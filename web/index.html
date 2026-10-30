@@ -73,10 +73,9 @@
       </div>
 
       <!-- 桌面版下载：主界面直接给入口，不用先绕去仓库的 releases 页。
-           Gitee / GitHub 两个地址都是 <主机>/<拥有者>/<仓库>/releases/latest/download/<资产名>
-           这种直链：两边都支持 302 到当前版本的真实资产、浏览器直接开始下载，
-           发版时只要资产名不变就不用改这里。第三个是网盘整包，
-           两个代码托管都连不上、或想要 PDF 之外的中文说明与截图时用。 -->
+           GitHub 用 releases/latest/download/<资产名> 直链（302 到当前版本，发版不用改）；
+           Gitee 的 latest 别名会把 latest 当分支名而 404，所以写死具体 tag。
+           第三个是网盘整包，两个代码托管都连不上时用。 -->
       <div class="exe-offer">
         <span class="exe-offer-ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -88,7 +87,7 @@
           <span data-i18n="intro.exeD">Windows 免安装单文件，点一下就把截图挪进待清理文件夹</span>
         </span>
         <span class="exe-offer-act">
-          <a class="exe-btn" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe" data-i18n="intro.exeGo">下载 exe</a>
+          <a class="exe-btn" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe" data-i18n="intro.exeGo">下载 exe</a>
           <span class="exe-alt-row">
             <a class="exe-btn-sub" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe" data-i18n="intro.exeGh">GitHub 备用</a>
             <span class="exe-alt-dot" aria-hidden="true">·</span>
@@ -114,7 +113,7 @@
         读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。
       </p>
       <p class="fallback-alt" data-i18n="fallback.alt">
-        也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。<a class="exe-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">下载 Windows 版</a>
+        也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。<a class="exe-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe">下载 Windows 版</a>
       </p>
     </div>
   </section>
@@ -207,7 +206,7 @@
     完全开源，MIT 协议。源码公开在 <a class="repo-link" href="https://github.com/3341284397-max/InfinityNikki-PhotoCleaner" target="_blank" rel="noopener">GitHub</a> 和 <a class="repo-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner" target="_blank" rel="noopener">Gitee</a>，每一行怎么判定的都能自己去核对，也可以拿去改。作者 Lyrins。
   </p>
   <p class="foot-dim" data-i18n="foot.tip">
-    不想下载脚本？<a class="exe-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe">下载桌面版</a>，点一下就把截图挪进待清理文件夹，还能一键还原。
+    不想下载脚本？<a class="exe-link" href="https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe">下载桌面版</a>，点一下就把截图挪进待清理文件夹，还能一键还原。
   </p>
 </footer>
 

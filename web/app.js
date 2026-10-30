@@ -12,14 +12,14 @@
   var LANG_KEY = 'nikki.lang.v1';
   var THUMB_W = 460;
 
-  /* 桌面版直链。用 releases/latest/download/<资产名> 而不是 /releases/latest：
-     前者 302 到当前版本的真实资产、浏览器直接开始下载，后者只是发行版说明页。
-     GitHub 和 Gitee 都认这个写法，连 latest 这个别名都支持，所以发新版不用改地址，
-     只要求两边发行版的资产名都叫 NikkiPhotoCleaner.exe。
+  /* 桌面版直链。GitHub 用 releases/latest/download/<资产名>，能 302 到当前版本的真实资产、
+     发新版不用改地址。Gitee 的 latest 别名会把 latest 当成分支名、跳到源码归档路径而 404，
+     所以 Gitee 必须写死具体 tag（releases/download/<tag>/<资产名>）——
+     发新版时这里的 tag 要跟着一起改。
      国内 CDN 走 Gitee，GitHub 当备用。
      文案里的 <a class="exe-link"> 统一由 relinkExe() 补地址；index.html 里写死的
      href 则是没有 JS 时的兜底，改地址时两边都要动。 */
-  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
+  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe';
   var EXE_URL_ALT = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
   /* 第三个入口：网盘整包（exe + GBK 中文说明 + 截图 + 零依赖版）。
      两个代码托管都连不上、或想要一份「给人看」的说明时用它。
