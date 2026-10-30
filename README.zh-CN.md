@@ -215,6 +215,7 @@ src/scripts/    PowerShell 零依赖版（含 lang/PhotoSync.en.ps1 英文语言
 src/test/       回归测试宿主（net8），run-tests.sh 共 13 个用例
 web/            网页版（index.html / styles.css / app.js），纯静态
 package/        四个双击即用的 .bat 启动器（中英各四个）
+src/pack/       打「网盘分享包」：exe + 使用说明.txt + 截图 + 零依赖版
 docs/           截图
 ```
 

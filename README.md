@@ -219,6 +219,7 @@ src/scripts/    Zero-dependency PowerShell version (lang/PhotoSync.en.ps1 holds 
 src/test/       Regression host (net8); run-tests.sh covers 13 cases
 web/            Static web version (index.html / styles.css / app.js)
 package/        Four double-click .bat launchers, in Chinese and English
+src/pack/       Builds the share package for cloud drives (exe + 使用说明.txt + screenshots)
 docs/           Screenshots
 ```
 
