@@ -143,5 +143,60 @@ console.log('\n[5] 英文版（纯 ASCII，任何代码页都能跑）');
   ok(moved.length === 3, '3 张被移到 NikkiCleaner_ToDelete', '实际 ' + moved.length);
 }
 
+/* ---------- 6. 网页填了路径：脚本放哪都能直接跑 ---------- */
+console.log('\n[6] 网页上填好路径，脚本在下载目录里直接双击');
+{
+  const s = sandbox('zh', { outside: true, srcPath: null });
+  const built = gen.build('zh', NAMES.concat([GONE]), { srcPath: s.shot });
+  const script = path.join(path.dirname(s.script), built.filename);
+  fs.writeFileSync(script, Buffer.from(built.bytes));
+
+  const r = run(script, '\r\n\r\n');   // 不喂路径，全靠脚本里写死的那行
+  const moved = listing(path.join(s.shot, '无限暖暖清理助手_待清理照片'));
+  ok(moved.length === 3, '不用拖路径就把 3 张移走了', '实际 ' + moved.length);
+  ok(!/没有在脚本旁边找到截图文件夹/.test(text(r.out)), '没有弹出「请拖入文件夹」的提示');
+}
+
+/* ---------- 7. 复制的 cmd 命令能直接粘进窗口 ---------- */
+console.log('\n[7] 「复制命令」的文本粘进 cmd 交互窗口');
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nikki-cmd-'));
+  const shot = path.join(root, 'X6Game', 'ScreenShot');
+  fs.mkdirSync(shot, { recursive: true });
+  NAMES.forEach(n => fs.writeFileSync(path.join(shot, n), Buffer.from('jpeg')));
+
+  // 先放一张同名文件，验证命令里的 if exist 分支真的会改名
+  const dst = path.join(shot, '无限暖暖清理助手_待清理照片');
+  fs.mkdirSync(dst);
+  fs.writeFileSync(path.join(dst, NAMES[0]), Buffer.from('旧的'));
+
+  const built = gen.buildCommands('zh', NAMES.concat([GONE]), shot);
+  // 交互式 cmd 读 stdin：不带 /c，逐行执行，等价于手动粘贴
+  const p = spawnSync('cmd', [], { input: gbk(built.text), timeout: 30000 });
+  const out = text(p.stdout || Buffer.alloc(0));
+
+  const moved = listing(dst);
+  ok(moved.length === 4, '3 张 + 原有 1 张 = 4 个文件', moved.join(','));
+  ok(moved.includes(NAMES[0]), '原有的同名文件没被覆盖');
+  ok(moved.some(n => /_1\.jpeg$/.test(n)), '撞名的那张改名成了 _1', moved.join(','));
+  ok(fs.readFileSync(path.join(dst, NAMES[0]), 'utf8') === '旧的', '旧文件内容完好');
+  ok(!/语法|不是内部或外部命令|The syntax/i.test(out), '命令没有语法错误', out.slice(0, 400));
+}
+
+/* ---------- 8. Agent 提示词 ---------- */
+console.log('\n[8] 给 AI 助手的提示词');
+{
+  const p = gen.buildPrompt('zh', NAMES.concat([GONE]), 'D:\\Games\\X6Game\\ScreenShot');
+  ok(p.text.includes('D:\\Games\\X6Game\\ScreenShot'), '带上了源目录');
+  ok(p.text.includes('无限暖暖清理助手_待清理照片'), '带上了目标目录');
+  ok(NAMES.concat([GONE]).every(n => p.text.includes(n)), '4 个文件名一个不落');
+  ok(/只做移动，不要删除/.test(p.text), '写明了不许删除');
+  ok(/_1\.扩展名/.test(p.text), '写明了撞名怎么处理');
+  ok(/共 4 个/.test(p.text), '报了张数');
+
+  const en = gen.buildPrompt('en', NAMES, 'C:\\Games\\X6Game\\ScreenShot');
+  ok(!/[\u4e00-\u9fa5]/.test(en.text.replace('NikkiCleaner_ToDelete', '')), '英文版没有中文残留');
+}
+
 console.log(failed ? '\n有 ' + failed + ' 项没过\n' : '\n全部通过\n');
 process.exit(failed ? 1 : 0);

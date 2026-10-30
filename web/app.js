@@ -27,7 +27,7 @@
       'intro.s2t': '自动比对',
       'intro.s2d': '把本地截图和相册缓存对一遍，标出游戏里已删除的那些',
       'intro.s3t': '一键移进待清理文件夹',
-      'intro.s3d': '勾好之后下载一个小脚本，双击就把它们挪到一边，删不删还是你说了算',
+      'intro.s3d': '勾好之后点「移动照片」，把它们挪到一边，删不删还是你说了算',
       'intro.pick': '选择 X6Game 文件夹',
       'intro.demo': '还没有游戏目录？先看演示',
       'demo.badge': '演示数据',
@@ -39,6 +39,8 @@
       'fallback.d': '读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。',
       'fallback.alt': '也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。',
 
+      'ws.home': '返回',
+      'ws.homeTip': '回到首页，重新选文件夹',
       'ws.folder': '游戏文件夹',
       'ws.repick': '重新选择',
       'ws.rescan': '重新扫描',
@@ -50,19 +52,35 @@
       'ws.selected': '张已勾选',
       'ws.copy': '复制文件名',
       'ws.export': '导出待删清单',
-      'ws.script': '下载清理脚本',
+      'ws.script': '移动照片',
 
-      'dlg.title': '下载清理脚本',
-      'dlg.lede': '生成一个双击就能用的 .bat：自动新建「待清理照片」文件夹，把勾选的 <b>{0}</b> 张移进去。',
-      'dlg.s1': '把下载好的脚本<b>拖进</b> <code>X6Game\\ScreenShot</code> 文件夹 —— 挨着截图放，它自己就知道路径',
-      'dlg.s2': '双击运行。没放进 ScreenShot 也没关系，窗口会让你把文件夹拖进去',
-      'dlg.s3': '跑完它会问要不要删掉这个一次性脚本，选 Y 就消失',
+      'dlg.title': '把照片挪到一边',
+      'dlg.lede': '勾选的 <b>{0}</b> 张会移进「无限暖暖清理助手_待清理照片」。下面三种办法任选一种，都只移动、不删照片。',
+      'dlg.pathLabel': '截图文件夹的完整路径（可选）',
+      'dlg.pathHint': '浏览器不会把文件夹路径告诉网页，所以这一栏要你自己粘 —— 在资源管理器地址栏点一下就能复制。填了脚本放哪儿都能跑；不填也行，双击时它会让你把文件夹拖进窗口。',
+      'dlg.paste': '粘贴',
+      'dlg.w1t': '下载脚本，双击运行',
+      'dlg.w1tag': '最省事',
+      'dlg.w1d': '一个纯文本 .bat，双击就建好文件夹、把照片移进去，跑完还问你要不要把它自己删掉。',
+      'dlg.w2t': '复制命令，粘进命令行窗口',
+      'dlg.w2tag': '脚本被拦时用这个',
+      'dlg.w2d': '没有文件落到磁盘上，安全软件没东西可拦。开始菜单搜 cmd 打开窗口，右键粘贴，回车。',
+      'dlg.w3t': '交给你的 AI 助手',
+      'dlg.w3tag': '兜底',
+      'dlg.w3d': '把这段提示词给能操作电脑的助手（Copilot、Claude、ChatGPT 之类），它照着自己就把文件搬过去了。',
+      'dlg.cmd': '复制命令',
+      'dlg.pt': '复制提示词',
+      'dlg.save': '下载 txt',
       'dlg.peek': '先看看脚本长什么样',
-      'dlg.note': '脚本是纯文本批处理，右键 → 用记事本就能逐行核对，它只移动、不删除任何照片。首次运行 Windows 可能弹一次「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」就好。',
-      'dlg.cancel': '取消',
+      'dlg.note': '三条路都是纯本地操作：只移动、不删除。照片搬到「待清理照片」文件夹之后，删不删、什么时候删，全由你在资源管理器里决定。',
+      'dlg.close': '关闭',
       'dlg.download': '下载脚本',
       'dlg.more': '… 后面还有 {0} 行，格式和上面一样',
       'act.scripted': '脚本已下载 —— 拖进 ScreenShot 文件夹再双击',
+      'act.cmdCopied': '命令已复制 —— 打开 cmd 窗口，右键粘贴，回车',
+      'act.ptCopied': '提示词已复制，发给你的助手就行',
+      'act.saved': '已下载 {0}',
+      'act.pasteFail': '浏览器不让读剪贴板，直接按 Ctrl+V 吧',
       'act.noScript': '脚本组件没加载出来，刷新页面再试',
 
       'st.keep': '仍在相册',
@@ -120,7 +138,7 @@
       'intro.s2t': 'Compare automatically',
       'intro.s2d': 'Local screenshots are matched against the album cache, highlighting the ones you deleted',
       'intro.s3t': 'Move them aside in one go',
-      'intro.s3d': 'Tick what you want, download a small script, double-click it and they are moved aside - deleting stays your call',
+      'intro.s3d': 'Tick what you want, press “Move photos” and they are moved aside - deleting stays your call',
       'intro.pick': 'Select the X6Game folder',
       'intro.demo': 'No game folder handy? See the demo',
       'demo.badge': 'Demo data',
@@ -132,6 +150,8 @@
       'fallback.d': 'Reading a local folder needs <b>desktop Chrome or Edge (86+)</b>. Firefox, Safari and mobile browsers do not support it.',
       'fallback.alt': 'You can also use the desktop app: same detection, plus it moves the files into a review folder so you can delete them in one go.',
 
+      'ws.home': 'Home',
+      'ws.homeTip': 'Back to the start page and pick another folder',
       'ws.folder': 'Game folder',
       'ws.repick': 'Change',
       'ws.rescan': 'Rescan',
@@ -143,19 +163,35 @@
       'ws.selected': 'selected',
       'ws.copy': 'Copy file names',
       'ws.export': 'Export list',
-      'ws.script': 'Download cleanup script',
+      'ws.script': 'Move photos',
 
-      'dlg.title': 'Download the cleanup script',
-      'dlg.lede': 'Builds a double-clickable .bat that creates the review folder and moves the <b>{0}</b> selected photos into it.',
-      'dlg.s1': '<b>Drop the script into</b> <code>X6Game\\ScreenShot</code> — next to the photos, it can find the path itself',
-      'dlg.s2': 'Double-click it. If it is not in ScreenShot, the window will ask you to drag the folder in',
-      'dlg.s3': 'When done it asks whether to delete this one-time script — answer Y and it is gone',
+      'dlg.title': 'Move the photos aside',
+      'dlg.lede': 'The <b>{0}</b> selected photos go into a review folder. Pick any one of the three ways below — all of them move files, none delete anything.',
+      'dlg.pathLabel': 'Full path of the screenshot folder (optional)',
+      'dlg.pathHint': 'Browsers never reveal a folder path to the page, so paste it here yourself — click the address bar in Explorer and copy. With a path filled in the script runs from anywhere; without it, the script will ask you to drag the folder in.',
+      'dlg.paste': 'Paste',
+      'dlg.w1t': 'Download the script, double-click it',
+      'dlg.w1tag': 'Simplest',
+      'dlg.w1d': 'A plain-text .bat: creates the folder, moves the photos in, then asks whether to delete itself.',
+      'dlg.w2t': 'Copy the commands into a console window',
+      'dlg.w2tag': 'Use this if the script is blocked',
+      'dlg.w2d': 'Nothing is written to disk, so there is no file for security software to block. Open Command Prompt from the Start menu, right-click to paste, press Enter.',
+      'dlg.w3t': 'Hand it to your AI assistant',
+      'dlg.w3tag': 'Last resort',
+      'dlg.w3d': 'Give this prompt to an assistant that can touch files (Copilot, Claude, ChatGPT…) and it will move them for you.',
+      'dlg.cmd': 'Copy commands',
+      'dlg.pt': 'Copy prompt',
+      'dlg.save': 'Save as .txt',
       'dlg.peek': 'Preview the script first',
-      'dlg.note': 'The script is a plain-text batch file: right-click → open in Notepad to read every line. It only moves files, never deletes photos. Windows may show "Windows protected your PC" once — click "More info → Run anyway".',
-      'dlg.cancel': 'Cancel',
+      'dlg.note': 'All three routes are purely local: move only, never delete. Once the photos sit in the review folder, whether and when to delete them is entirely your call in Explorer.',
+      'dlg.close': 'Close',
       'dlg.download': 'Download script',
       'dlg.more': '... {0} more lines, all the same shape',
       'act.scripted': 'Script downloaded — drop it into ScreenShot and double-click',
+      'act.cmdCopied': 'Commands copied — open Command Prompt, right-click to paste, press Enter',
+      'act.ptCopied': 'Prompt copied — hand it to your assistant',
+      'act.saved': 'Downloaded {0}',
+      'act.pasteFail': 'The browser would not let me read the clipboard — press Ctrl+V instead',
       'act.noScript': 'The script module did not load — reload the page',
 
       'st.keep': 'In album',
@@ -300,6 +336,10 @@
       node.setAttribute('placeholder', t(node.getAttribute('data-i18n-ph')));
     });
 
+    document.querySelectorAll('[data-i18n-title]').forEach(function (node) {
+      node.setAttribute('title', t(node.getAttribute('data-i18n-title')));
+    });
+
     el.btnLang.textContent = state.lang === 'en' ? '中文' : 'EN';
 
     if (state.items.length) { render(); updateNotice(); }
@@ -428,8 +468,7 @@
     state.selected = new Set();
     items.forEach(function (it) { if (it.status === STATUS.Deleted) state.selected.add(it.name); });
 
-    el.intro.hidden = true;
-    el.workspace.hidden = false;
+    enterWorkspace();
     el.dirName.textContent = state.dir.name;
     el.dirMeta.textContent = tf('meta.count', items.length, albumDirs) + ' · ' + tf('meta.scanned', fmtTime(new Date()));
 
@@ -671,11 +710,15 @@
     toast(tf('act.exported', list.length));
   }
 
-  /* ---------------- 下载清理脚本 ----------------
-     浏览器碰不到「移动文件」这件事，所以把要移的名单编成一个 .bat，
-     让 Windows 自己去新建文件夹、移动照片。生成逻辑在 script-gen.js。 */
+  /* ---------------- 移动照片：三条路 ----------------
+     浏览器碰不到「移动文件」，所以给出三条路：
+       1. 下载 .bat，Windows 自己跑；
+       2. 复制命令，粘进 cmd 窗口 —— 不落盘，被安全软件拦的时候走这条；
+       3. 复制提示词，交给用户自己的 AI 助手。
+     生成逻辑全在 script-gen.js，这里只管取名单、拼界面、下载。 */
   var scriptReady = null;
   var PREVIEW_LINES = 24;
+  var PATH_KEY = 'nikki.path.v1';
 
   function buildPreview(text) {
     var lines = text.split('\r\n');
@@ -684,14 +727,32 @@
       tf('dlg.more', lines.length - PREVIEW_LINES);
   }
 
+  function currentPath() {
+    return el.dlgPath ? el.dlgPath.value.trim() : '';
+  }
+
+  /** 三条路共用同一份名单和路径，任何一处变了就整体重来 */
+  function rebuild() {
+    if (!window.NikkiScript) return null;
+    var names = selectedItems().map(function (i) { return i.name; });
+    var opts = { srcPath: currentPath() };
+    scriptReady = {
+      bat: window.NikkiScript.build(state.lang, names, opts),
+      cmd: window.NikkiScript.buildCommands(state.lang, names, opts.srcPath),
+      prompt: window.NikkiScript.buildPrompt(state.lang, names, opts.srcPath)
+    };
+    el.dlgPre.textContent = buildPreview(scriptReady.bat.text);
+    return scriptReady;
+  }
+
   function openScriptDialog() {
     var list = selectedItems();
     if (!list.length) { toast(t('act.nothing')); return; }
     if (!window.NikkiScript) { toast(t('act.noScript'), 'bad'); return; }
 
-    scriptReady = window.NikkiScript.build(state.lang, list.map(function (i) { return i.name; }));
     el.dlgLede.innerHTML = tf('dlg.lede', list.length);
-    el.dlgPre.textContent = buildPreview(scriptReady.text);
+    try { el.dlgPath.value = localStorage.getItem(PATH_KEY) || ''; } catch (e) { el.dlgPath.value = ''; }
+    rebuild();
     el.dlgScript.hidden = false;
     document.body.style.overflow = 'hidden';
     el.dlgGo.focus();
@@ -703,19 +764,61 @@
     scriptReady = null;
   }
 
-  function downloadScript() {
-    if (!scriptReady) return;
-    var blob = new Blob([scriptReady.bytes], { type: 'application/octet-stream' });
+  /** 复制：优先 Clipboard API，被拒（或老浏览器）就退回 execCommand */
+  function copyPlain(text, okKey) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { }
+      document.body.removeChild(ta);
+      toast(ok ? t(okKey) : t('act.copyFail'), ok ? '' : 'bad');
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast(t(okKey));
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  /**
+   * 存成 .txt。提示词加 BOM（记事本打开中文才不会花）；
+   * 命令块不加 —— BOM 会被用户一起复制走，粘进 cmd 时第一行前面多一个看不见的字符，
+   * 报一句「不是内部或外部命令」。
+   */
+  function saveText(name, text, withBom) {
+    var blob = new Blob([(withBom ? '\ufeff' : '') + text], { type: 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = scriptReady.filename;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    toast(tf('act.saved', name));
+  }
+
+  function downloadScript() {
+    if (!scriptReady) return;
+    var blob = new Blob([scriptReady.bat.bytes], { type: 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = scriptReady.bat.filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
     toast(t('act.scripted'));
-    closeScriptDialog();
   }
 
   /* ---------------- 演示模式 ----------------
@@ -835,8 +938,7 @@
       state.firstRun = false;
       state.isDemo = true;
 
-      el.intro.hidden = true;
-      el.workspace.hidden = false;
+      enterWorkspace();
       el.dirName.textContent = 'X6Game';
       el.dirMeta.textContent = t('demo.badge') + ' · ' + tf('meta.count', items.length, 3);
 
@@ -845,6 +947,52 @@
     } finally {
       setBusy(false);
     }
+  }
+
+  /* ---------------- 视图切换 ---------------- */
+  // 进工作区时压一条历史记录，这样浏览器自带的「后退」也能退回首页，
+  // 不用去刷页面。file:// 下个别浏览器不让改 history，出错就当没这回事。
+  function enterWorkspace() {
+    el.intro.hidden = true;
+    el.workspace.hidden = false;
+    try {
+      if (!history.state || history.state.view !== 'workspace') {
+        history.pushState({ view: 'workspace' }, '', '#scan');
+      }
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /** 只负责把界面收回首页，不碰 history */
+  function resetHome() {
+    state.items = [];
+    state.selected = new Set();
+    state.byName = new Map();
+    state.query = '';
+    state.onlyPending = false;
+    state.isDemo = false;
+    state.dir = null;
+
+    el.workspace.hidden = true;
+    el.actionbar.hidden = true;
+    el.intro.hidden = false;
+    el.grid.innerHTML = '';
+    el.empty.hidden = true;
+    el.notice.hidden = true;
+    el.search.value = '';
+    el.onlyPending.checked = false;
+    el.nKeep.textContent = el.nDel.textContent = el.nSus.textContent = el.nNew.textContent = '0';
+    el.dirName.textContent = '';
+    el.dirMeta.textContent = '';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /** 「返回」按钮：优先走浏览器的后退，键盘上的返回键和它效果一致 */
+  function goHome() {
+    try {
+      if (history.state && history.state.view === 'workspace') { history.back(); return; }
+    } catch (e) { /* 忽略 */ }
+    resetHome();
   }
 
   /* ---------------- 事件 ---------------- */
@@ -880,6 +1028,7 @@
       fallback: document.getElementById('fallback'),
       btnPick: document.getElementById('btnPick'),
       btnDemo: document.getElementById('btnDemo'),
+      btnHome: document.getElementById('btnHome'),
       btnRepick: document.getElementById('btnRepick'),
       btnRescan: document.getElementById('btnRescan'),
       btnLang: document.getElementById('btnLang'),
@@ -907,6 +1056,12 @@
       dlgMask: document.getElementById('dlgMask'),
       dlgLede: document.getElementById('dlgLede'),
       dlgPre: document.getElementById('dlgPre'),
+      dlgPath: document.getElementById('dlgPath'),
+      dlgPathPaste: document.getElementById('dlgPathPaste'),
+      dlgCmd: document.getElementById('dlgCmd'),
+      dlgCmdDl: document.getElementById('dlgCmdDl'),
+      dlgPt: document.getElementById('dlgPt'),
+      dlgPtDl: document.getElementById('dlgPtDl'),
       dlgCancel: document.getElementById('dlgCancel'),
       dlgGo: document.getElementById('dlgGo'),
       modal: document.getElementById('modal'),
@@ -976,6 +1131,44 @@
     el.dlgCancel.addEventListener('click', closeScriptDialog);
     el.dlgMask.addEventListener('click', closeScriptDialog);
     el.dlgGo.addEventListener('click', downloadScript);
+
+    if (el.btnHome) el.btnHome.addEventListener('click', goHome);
+
+    // 路径随时可以改，改一次就把 .bat / 命令 / 提示词一起重建
+    el.dlgPath.addEventListener('input', function () {
+      try { localStorage.setItem(PATH_KEY, currentPath()); } catch (e) { }
+      rebuild();
+    });
+
+    el.dlgPathPaste.addEventListener('click', function () {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        toast(t('act.pasteFail'), 'bad');
+        return;
+      }
+      navigator.clipboard.readText().then(function (txt) {
+        el.dlgPath.value = (txt || '').trim();
+        try { localStorage.setItem(PATH_KEY, el.dlgPath.value); } catch (e) { }
+        rebuild();
+      }).catch(function () { toast(t('act.pasteFail'), 'bad'); });
+    });
+
+    el.dlgCmd.addEventListener('click', function () {
+      if (scriptReady) copyPlain(scriptReady.cmd.text, 'act.cmdCopied');
+    });
+    el.dlgCmdDl.addEventListener('click', function () {
+      if (scriptReady) saveText(scriptReady.cmd.filename, scriptReady.cmd.text, false);
+    });
+    el.dlgPt.addEventListener('click', function () {
+      if (scriptReady) copyPlain(scriptReady.prompt.text, 'act.ptCopied');
+    });
+    el.dlgPtDl.addEventListener('click', function () {
+      if (scriptReady) saveText(scriptReady.prompt.filename, scriptReady.prompt.text, true);
+    });
+
+    // 浏览器后退键 / 我们自己的「返回」都走这里：把工作区收起来
+    window.addEventListener('popstate', function () {
+      if (!el.workspace.hidden) resetHome();
+    });
 
     el.modalClose.addEventListener('click', closeModal);
     el.modalMask.addEventListener('click', closeModal);

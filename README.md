@@ -112,22 +112,34 @@ No game folder? Click *See a demo first*, or open with `?demo=1`.
 ![Web version](docs/screenshots/web-en.png)
 
 Browsers are not allowed to move local files from a page, so the web version hands
-that one step back to you. Tick the photos, press *Download cleanup script*, and you
-get a small `.bat`. Drop it into `X6Game\ScreenShot` and double-click it.
+that one step back to you. Tick the photos, press *Move photos*, and the dialog offers
+three routes — pick whichever works on your machine:
 
-The script does exactly three things, all of them readable:
+**1. Download the script and double-click it** (easiest)
+You get a `.bat` of a few KB. Drop it into `X6Game\ScreenShot` and run it. If you paste
+the full screenshot-folder path into the dialog first, the script runs from anywhere.
 
-1. Creates a `无限暖暖清理助手_待清理照片` folder
-2. **Moves** the listed photos into it (name clashes get `_1`, nothing is overwritten)
-3. Asks whether to delete itself — answering `Y` removes the script
+**2. Copy the commands into a console window** (use this when the script gets blocked)
+Nothing is written to disk, so there is no file to block. Open Command Prompt from the
+Start menu, right-click to paste, press Enter. Each photo is one `if exist … move …`
+line — name clashes become `_1`, nothing is overwritten — and a leading `chcp 936`
+keeps Chinese paths readable.
 
-It never deletes a photo, and nothing is hidden behind `certutil` — open it in Notepad
-and read every line. Deleting the photos stays your job, in Explorer, by hand.
+**3. Copy the prompt and hand it to your AI assistant** (last resort)
+Give the prompt from the dialog to an assistant that can touch files (Copilot, Claude,
+ChatGPT…). It states the source folder, target folder, the file list, and the rules:
+move only, never delete, do not overwrite.
 
-![Downloading the script](docs/screenshots/web-script-en.png)
+All three can be previewed first via *Preview the script first*.
+
+![Moving the photos](docs/screenshots/web-script-en.png)
 
 A few details:
 
+- **Why you paste a path.** Browsers never reveal a folder path to the page — only the
+  folder name. Paste the full path once in the dialog (click the address bar in Explorer
+  to copy it) and it is remembered; the script and the commands then locate the folder
+  themselves instead of asking you to drag it in
 - The script first looks for one of the listed photos next to itself, then in a
   `ScreenShot\` subfolder. Only if neither works does it ask you to drag the folder in
 - Photos that are already gone count as *skipped*, not failed. If nothing moves, no
@@ -135,8 +147,11 @@ A few details:
 - The Chinese script is written as **GBK**. `cmd` reads a batch file byte by byte in the
   console code page, so a UTF-8 Chinese batch file misparses lines — in testing it ran
   the "delete yourself?" prompt as a command
-- SmartScreen may block it once on first run. Choose *More info → Run anyway*. That is
-  the standard greeting for any downloaded `.bat`, not a sign of a broken script
+- **If the script gets blocked.** A `.bat` downloaded from a browser carries the
+  mark-of-the-web, and SmartScreen or a security suite may refuse to run it at all —
+  even *More info → Run anyway* is sometimes not offered. It is not the contents
+  (a few dozen `move` lines), it is the extension. The easy way around it is route 2
+  above: no file on disk, nothing to block. Routes 3 and the exe are there as backup
 
 > If you would rather move files with a single click, use the exe — it moves locally and
 > can restore in one click. The web version's value is installing nothing at all, and
@@ -219,9 +234,9 @@ and that switching language never splits the data folder (cases 12 and 13).
 - Detection relies on the game's album cache layout (`Saved/GamePlayPhotos/*/NikkiPhotos_*`).
   A major game update that changes that layout would require adjusting the scanner
 - Matching is by file name. If the game renames a file, it will show up as "Unsure"
-- The web version itself cannot move files (browser sandbox). It downloads a one-time
-  script you run locally; that script has no undo, so use the exe or PowerShell version
-  if you want restore
+- The web version itself cannot move files (browser sandbox). It only produces a script,
+  commands or a prompt for you to run locally, and none of the three can undo a move —
+  use the exe or the scripts under `src/scripts` if you want restore
 - Only verified on Windows
 
 ## License

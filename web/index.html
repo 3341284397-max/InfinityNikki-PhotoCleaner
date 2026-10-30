@@ -57,7 +57,7 @@
         <div class="step">
           <span class="step-num">3</span>
           <h3 data-i18n="intro.s3t">一键移进待清理文件夹</h3>
-          <p data-i18n="intro.s3d">勾好之后下载一个小脚本，双击就把它们挪到一边，删不删还是你说了算</p>
+          <p data-i18n="intro.s3d">勾好之后点「移动照片」，把它们挪到一边，删不删还是你说了算</p>
         </div>
       </div>
 
@@ -96,6 +96,13 @@
   <!-- ===== 工作区 ===== -->
   <section id="workspace" class="workspace" hidden>
     <div class="pathbar">
+      <button class="path-back" id="btnHome" data-i18n-title="ws.homeTip">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 19 8 12l7-7"/>
+        </svg>
+        <span data-i18n="ws.home">返回</span>
+      </button>
+      <span class="path-div" aria-hidden="true"></span>
       <span class="path-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.4h7A1.5 1.5 0 0 1 19 10v7.5A1.5 1.5 0 0 1 17.5 19h-13A1.5 1.5 0 0 1 3 17.5Z"/>
@@ -162,7 +169,7 @@
   <div class="actionbar-btns">
     <button class="btn btn-ghost" id="btnCopy" data-i18n="ws.copy">复制文件名</button>
     <button class="btn btn-ghost" id="btnExport" data-i18n="ws.export">导出待删清单</button>
-    <button class="btn btn-primary" id="btnScript" data-i18n="ws.script">下载清理脚本</button>
+    <button class="btn btn-primary" id="btnScript" data-i18n="ws.script">移动照片</button>
   </div>
 </div>
 
@@ -189,25 +196,72 @@
   </div>
 </div>
 
-<!-- ===== 下载清理脚本 ===== -->
+<!-- ===== 移动照片：三条路 ===== -->
 <div class="modal" id="dlgScript" hidden>
   <div class="modal-mask" id="dlgMask"></div>
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
-    <h3 id="dlgTitle" data-i18n="dlg.title">下载清理脚本</h3>
+  <div class="sheet sheet-wide" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h3 id="dlgTitle" data-i18n="dlg.title">把照片挪到一边</h3>
     <p class="sheet-lede" id="dlgLede"></p>
-    <ol class="sheet-steps">
-      <li data-i18n="dlg.s1">把下载好的脚本拖进 ScreenShot 文件夹</li>
-      <li data-i18n="dlg.s2">双击运行</li>
-      <li data-i18n="dlg.s3">跑完问你要不要删掉它</li>
-    </ol>
+
+    <div class="pathfield">
+      <label class="pathfield-label" for="dlgPath" data-i18n="dlg.pathLabel">截图文件夹的完整路径（可选）</label>
+      <div class="pathfield-row">
+        <input id="dlgPath" type="text" spellcheck="false" autocomplete="off"
+               placeholder="D:\Games\X6Game\ScreenShot">
+        <button class="btn btn-ghost btn-sm" id="dlgPathPaste" data-i18n="dlg.paste">粘贴</button>
+      </div>
+      <p class="pathfield-hint" data-i18n="dlg.pathHint">浏览器不会把文件夹路径告诉网页，所以这一栏要你自己粘 —— 在资源管理器地址栏点一下就能复制。填了脚本放哪儿都能跑；不填也行，双击时它会让你把文件夹拖进窗口。</p>
+    </div>
+
+    <div class="ways">
+      <section class="way">
+        <div class="way-head">
+          <span class="way-n">1</span>
+          <h4 data-i18n="dlg.w1t">下载脚本，双击运行</h4>
+          <span class="way-tag" data-i18n="dlg.w1tag">最省事</span>
+        </div>
+        <p data-i18n="dlg.w1d">一个纯文本 .bat，双击就建好文件夹、把照片移进去，跑完还问你要不要把它自己删掉。</p>
+        <div class="way-btns">
+          <button class="btn btn-primary btn-sm" id="dlgGo" data-i18n="dlg.download">下载脚本</button>
+        </div>
+      </section>
+
+      <section class="way">
+        <div class="way-head">
+          <span class="way-n">2</span>
+          <h4 data-i18n="dlg.w2t">复制命令，粘进命令行窗口</h4>
+          <span class="way-tag way-tag-warn" data-i18n="dlg.w2tag">脚本被拦时用这个</span>
+        </div>
+        <p data-i18n="dlg.w2d">没有文件落到磁盘上，安全软件没东西可拦。开始菜单搜 cmd 打开窗口，右键粘贴，回车。</p>
+        <div class="way-btns">
+          <button class="btn btn-ghost btn-sm" id="dlgCmd" data-i18n="dlg.cmd">复制命令</button>
+          <button class="btn btn-ghost btn-sm" id="dlgCmdDl" data-i18n="dlg.save">下载 txt</button>
+        </div>
+      </section>
+
+      <section class="way">
+        <div class="way-head">
+          <span class="way-n">3</span>
+          <h4 data-i18n="dlg.w3t">交给你的 AI 助手</h4>
+          <span class="way-tag" data-i18n="dlg.w3tag">兜底</span>
+        </div>
+        <p data-i18n="dlg.w3d">把这段提示词给能操作电脑的助手（Copilot、Claude、ChatGPT 之类），它照着自己就把文件搬过去了。</p>
+        <div class="way-btns">
+          <button class="btn btn-ghost btn-sm" id="dlgPt" data-i18n="dlg.pt">复制提示词</button>
+          <button class="btn btn-ghost btn-sm" id="dlgPtDl" data-i18n="dlg.save">下载 txt</button>
+        </div>
+      </section>
+    </div>
+
     <details class="sheet-more">
       <summary data-i18n="dlg.peek">先看看脚本长什么样</summary>
       <pre id="dlgPre"></pre>
     </details>
-    <p class="sheet-note" data-i18n="dlg.note">脚本是纯文本。</p>
+
+    <p class="sheet-note" data-i18n="dlg.note">三条路都是纯本地操作：只移动、不删除。照片搬到「待清理照片」文件夹之后，删不删、什么时候删，全由你在资源管理器里决定。</p>
+
     <div class="sheet-btns">
-      <button class="btn btn-ghost" id="dlgCancel" data-i18n="dlg.cancel">取消</button>
-      <button class="btn btn-primary" id="dlgGo" data-i18n="dlg.download">下载脚本</button>
+      <button class="btn btn-ghost" id="dlgCancel" data-i18n="dlg.close">关闭</button>
     </div>
   </div>
 </div>
