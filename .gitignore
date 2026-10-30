@@ -1,0 +1,23 @@
+# 构建产物
+bin/
+obj/
+dist/
+*.user
+*.suo
+.vs/
+
+# 本地截图与临时脚本，不入库
+_shots/
+_tmp_*
+_tmp*/
+
+# 工具自己在测试时产生的数据
+**/无限暖暖清理助手_使用数据/
+**/NikkiCleaner_Data/
+**/无限暖暖清理助手_待清理照片/
+**/NikkiCleaner_ToDelete/
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store

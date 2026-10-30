@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>无限暖暖 · 照片清理助手</title>
+<meta name="description" content="找出游戏里已经删掉、电脑上还留着的截图。纯本地运行，照片不会离开你的电脑。">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== 顶栏 ===== -->
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <img src="favicon.png" alt="" width="36" height="36">
+    </span>
+    <div class="brand-text">
+      <h1 data-i18n="app.title">无限暖暖 · 照片清理助手</h1>
+      <p data-i18n="app.sub">只帮你找出该删的截图，删除这一步永远由你亲手完成</p>
+    </div>
+  </div>
+
+  <div class="top-actions">
+    <button class="btn btn-ghost btn-sm" id="btnLang" title="Switch language / 切换语言">EN</button>
+    <a class="btn btn-ghost btn-sm" href="https://github.com/" target="_blank" rel="noopener" data-i18n="app.github">GitHub</a>
+  </div>
+</header>
+
+<main>
+  <!-- ===== 欢迎页 ===== -->
+  <section id="intro" class="intro">
+    <div class="intro-card">
+      <span class="leaf leaf-1" aria-hidden="true"></span>
+      <span class="leaf leaf-2" aria-hidden="true"></span>
+
+      <p class="eyebrow" data-i18n="intro.eyebrow">给搭配师的本地小工具</p>
+      <h2 data-i18n="intro.h2">游戏里删掉的截图，电脑上还在占地方</h2>
+      <p class="lede" data-i18n="intro.lede">
+        在《无限暖暖》里删掉相册照片后，<code>X6Game\ScreenShot</code> 里的原图不会跟着消失。
+        这个工具帮你把它们挑出来——照片不上传、不联网，全部在你的浏览器里完成。
+      </p>
+
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <h3 data-i18n="intro.s1t">选择游戏文件夹</h3>
+          <p data-i18n="intro.s1d">选中 <code>X6Game</code> 这一层，浏览器会向你请求读取权限</p>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <h3 data-i18n="intro.s2t">自动比对</h3>
+          <p data-i18n="intro.s2d">把本地截图和相册缓存对一遍，标出游戏里已删除的那些</p>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <h3 data-i18n="intro.s3t">导出清单，自己删</h3>
+          <p data-i18n="intro.s3d">按文件名逐张核对，导出待删清单后在资源管理器里处理</p>
+        </div>
+      </div>
+
+      <div class="cta">
+        <button class="btn btn-primary btn-lg" id="btnPick">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.4h7A1.5 1.5 0 0 1 19 10v7.5A1.5 1.5 0 0 1 17.5 19h-13A1.5 1.5 0 0 1 3 17.5Z"/>
+          </svg>
+          <span data-i18n="intro.pick">选择 X6Game 文件夹</span>
+        </button>
+        <button class="btn btn-link" id="btnDemo" data-i18n="intro.demo">还没有游戏目录？先看演示</button>
+        <p class="cta-note" id="pickNote" data-i18n="intro.pickNote">首次使用会从这里建立一份「相册台账」，之后才能判断哪些是你在游戏里删掉的</p>
+      </div>
+
+      <div class="privacy">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3.2 4.8 6v5.4c0 4.3 3 7.6 7.2 9.4 4.2-1.8 7.2-5.1 7.2-9.4V6Z"/>
+          <path d="m9 12.2 2.1 2.1 4-4.2"/>
+        </svg>
+        <span data-i18n="intro.privacy">没有服务器、没有上传、没有统计。断网也能用。</span>
+      </div>
+    </div>
+
+    <!-- 不支持的浏览器 -->
+    <div class="fallback" id="fallback" hidden>
+      <h3 data-i18n="fallback.t">这个浏览器暂时用不了</h3>
+      <p data-i18n="fallback.d">
+        读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。
+      </p>
+      <p class="fallback-alt" data-i18n="fallback.alt">
+        也可以改用桌面版程序：功能一样，还多一步「把截图移进待清理文件夹」，方便你一次性删除。
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== 工作区 ===== -->
+  <section id="workspace" class="workspace" hidden>
+    <div class="pathbar">
+      <span class="path-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.4h7A1.5 1.5 0 0 1 19 10v7.5A1.5 1.5 0 0 1 17.5 19h-13A1.5 1.5 0 0 1 3 17.5Z"/>
+        </svg>
+      </span>
+      <span class="path-label" data-i18n="ws.folder">游戏文件夹</span>
+      <span class="path-name" id="dirName">X6Game</span>
+      <span class="path-sep"></span>
+      <span class="path-meta" id="dirMeta"></span>
+      <button class="btn btn-ghost btn-sm" id="btnRepick" data-i18n="ws.repick">重新选择</button>
+      <button class="btn btn-ghost btn-sm" id="btnRescan" data-i18n="ws.rescan">重新扫描</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat stat-keep">
+        <span class="stat-n" id="nKeep">0</span>
+        <span class="stat-l" data-i18n="st.keep">仍在相册</span>
+      </div>
+      <div class="stat stat-del">
+        <span class="stat-n" id="nDel">0</span>
+        <span class="stat-l" data-i18n="st.del">游戏里已删</span>
+      </div>
+      <div class="stat stat-sus">
+        <span class="stat-n" id="nSus">0</span>
+        <span class="stat-l" data-i18n="st.sus">无法确认</span>
+      </div>
+      <div class="stat stat-new">
+        <span class="stat-n" id="nNew">0</span>
+        <span class="stat-l" data-i18n="st.new">太新跳过</span>
+      </div>
+    </div>
+
+    <div class="notice" id="notice" hidden>
+      <span class="notice-icon" aria-hidden="true">!</span>
+      <div class="notice-text">
+        <b id="noticeTitle"></b>
+        <span id="noticeBody"></span>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <label class="check">
+        <input type="checkbox" id="onlyPending">
+        <span data-i18n="ws.onlyPending">只看待处理</span>
+      </label>
+      <span class="toolbar-gap"></span>
+      <input class="search" id="search" type="search" data-i18n-ph="ws.search" placeholder="搜索文件名">
+      <button class="btn btn-ghost btn-sm" id="btnSelDel" data-i18n="ws.selDel">勾选全部已删</button>
+      <button class="btn btn-ghost btn-sm" id="btnClear" data-i18n="ws.clear">取消勾选</button>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" hidden></div>
+  </section>
+</main>
+
+<!-- 底部操作条：必须放在 main 之外。#workspace 带 rise 动画的 transform，
+     会给 position:fixed 的子元素另建包含块，操作条就会卡在网格中间而不是贴底。 -->
+<div class="actionbar" id="actionbar" hidden>
+  <div class="actionbar-info">
+    <b id="selCount">0</b>
+    <span data-i18n="ws.selected">张已勾选</span>
+  </div>
+  <div class="actionbar-btns">
+    <button class="btn btn-ghost" id="btnCopy" data-i18n="ws.copy">复制文件名</button>
+    <button class="btn btn-primary" id="btnExport" data-i18n="ws.export">导出待删清单</button>
+  </div>
+</div>
+
+<footer class="foot">
+  <p data-i18n="foot.disclaimer">
+    非官方工具，与叠纸游戏 / 《无限暖暖》官方无关。所有判定只依据本地缓存的比对结果，不读取账号信息。
+  </p>
+  <p class="foot-dim" data-i18n="foot.tip">
+    想连「移动文件」也自动化？桌面版还支持把截图移进待清理文件夹、一键还原。
+  </p>
+</footer>
+
+<!-- ===== 大图查看 ===== -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-mask" id="modalMask"></div>
+  <div class="modal-body" role="dialog" aria-modal="true">
+    <button class="modal-close" id="modalClose" aria-label="Close">×</button>
+    <img id="modalImg" alt="">
+    <div class="modal-meta">
+      <span class="badge" id="modalBadge"></span>
+      <span id="modalName" class="modal-name"></span>
+      <span id="modalInfo" class="modal-info"></span>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

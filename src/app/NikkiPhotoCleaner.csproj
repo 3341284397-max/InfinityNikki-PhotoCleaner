@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    .NET Framework 4.8 + WinForms：
+    Win10 1903+ / Win11 自带 4.8 运行时，用户双击即用，不装任何东西。
+    输出单个 exe，不产生依赖 DLL。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>7.3</LangVersion>
+    <RootNamespace>NikkiPhotoCleaner</RootNamespace>
+    <AssemblyName>NikkiPhotoCleaner</AssemblyName>
+    <AssemblyTitle>Infinity Nikki Photo Cleanup Assistant</AssemblyTitle>
+    <Product>Infinity Nikki Photo Cleanup Assistant</Product>
+    <Description>Finds photos you deleted in-game that are still on disk. Never deletes anything itself.</Description>
+    <Company>InfinityNikki-PhotoCleaner contributors</Company>
+    <Copyright>MIT License</Copyright>
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <FileVersion>1.3.0.0</FileVersion>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <!-- 大喵扫地：猫头用于 16~48px，整幅插画用于 64px 以上 -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    回归测试专用。把 app/ 的源码原样编成 net8 程序集，
+    用 `dotnet NikkiTest.dll` 运行，绕开 SAC 对新 exe 的拦截。
+    net8.0-windows + UseWindowsForms 是为了让 MainForm 等 UI 代码能通过编译，
+    测试只调用其中的纯逻辑部分。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseAppHost>false</UseAppHost>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>NikkiPhotoCleaner</RootNamespace>
+    <AssemblyName>NikkiTest</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <StartupObject>NikkiPhotoCleaner.Runner</StartupObject>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>CA1416;CS0162;CS0168;CS0219;CS0414;CS0649;SYSLIB0011</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Runner.cs" />
+    <Compile Include="../app/*.cs" />
+  </ItemGroup>
+
+</Project>
