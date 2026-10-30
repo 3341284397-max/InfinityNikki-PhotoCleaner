@@ -21,6 +21,11 @@
      href 则是没有 JS 时的兜底，改地址时两边都要动。 */
   var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
   var EXE_URL_ALT = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
+  /* 第三个入口：网盘整包（exe + GBK 中文说明 + 截图 + 零依赖版）。
+     两个代码托管都连不上、或想要一份「给人看」的说明时用它。
+     网盘改名/换链接只改这一处和 index.html 里那行兜底 href；提取码在文案里，
+     跟着一起改。 */
+  var PAN_URL = 'https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w';
 
   /* ---------------- 文案 ---------------- */
   var I18N = {
@@ -48,6 +53,8 @@
       'intro.exeD': 'Windows 免安装单文件，点一下就把截图挪进待清理文件夹',
       'intro.exeGo': '下载 exe',
       'intro.exeGh': 'GitHub 备用',
+      'intro.exePan': '百度网盘（1111）',
+      'intro.panTip': '提取码 1111。整包含 exe、中文使用说明、三张截图，以及 exe 被拦时能用的零依赖版',
 
       'fallback.t': '这个浏览器暂时用不了',
       'fallback.d': '读取本地文件夹需要 <b>桌面版 Chrome 或 Edge（86 以上）</b>。Firefox、Safari 和手机浏览器都不支持这个能力。',
@@ -163,6 +170,8 @@
       'intro.exeD': 'A single portable Windows exe — it moves the screenshots into the review folder for you',
       'intro.exeGo': 'Download exe',
       'intro.exeGh': 'GitHub mirror',
+      'intro.exePan': 'Baidu Disk (1111)',
+      'intro.panTip': 'Code 1111. A bundle with the exe, screenshots and a no-dependency fallback for blocked exe',
 
       'fallback.t': 'This browser cannot do it yet',
       'fallback.d': 'Reading a local folder needs <b>desktop Chrome or Edge (86+)</b>. Firefox, Safari and mobile browsers do not support it.',
@@ -344,7 +353,8 @@
   /* i18n 一换文案，原来那些 <a> 节点就被重建了，href 得重新补 */
   function relinkExe() {
     document.querySelectorAll('a.exe-link, a.exe-btn').forEach(function (a) { a.href = EXE_URL; });
-    document.querySelectorAll('a.exe-btn-sub').forEach(function (a) { a.href = EXE_URL_ALT; });
+    document.querySelectorAll('a.exe-btn-sub:not(.exe-pan)').forEach(function (a) { a.href = EXE_URL_ALT; });
+    document.querySelectorAll('a.exe-pan').forEach(function (a) { a.href = PAN_URL; });
   }
 
   function applyLang() {

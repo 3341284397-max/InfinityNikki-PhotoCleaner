@@ -425,7 +425,7 @@ main {
   border-color: var(--green-line);
   box-shadow: var(--sh-xs);
 }
-/* 备用入口：弱化成一串灰字，不影响主按钮，但 GitHub 打不开的人找得到 */
+/* 备用入口：弱化成一串灰字，不影响主按钮，但 Gitee 打不开的人找得到 */
 .exe-btn-sub {
   font-size: 11.5px;
   font-weight: 500;
@@ -437,6 +437,16 @@ main {
   color: var(--green-deep);
   border-bottom-color: currentColor;
 }
+/* 主按钮下面那一行「GitHub 备用 · 百度网盘（提取码）」。
+   两个都是备选，并排写一行，别让它们各自占一层把下载条撑高 */
+.exe-alt-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.exe-alt-dot { color: var(--line); font-size: 11px; line-height: 1; }
 
 /* 正文里的桌面版链接（页脚那句提示、不支持浏览器的兜底卡片）。
    颜色跟随所在段落，只加下划线，别喧宾夺主 */
@@ -1135,11 +1145,14 @@ body.is-busy .btn { pointer-events: none; }
   .pathfield-row { flex-wrap: wrap; }
   .pathfield-row input { flex-basis: 100%; }
   .pathfield-row .btn { margin-left: auto; }
-  /* 下载条：窄屏下说明文字自己折行，两个入口落到第二行并排，
-     左边留出图标的宽度好跟文字对齐，不要悬在屏幕外 */
+  /* 下载条：窄屏下说明文字自己折行，主按钮 + 两个备用入口落到第二行并排，
+     左边留出图标的宽度好跟文字对齐，不要悬在屏幕外。
+     body 的基准宽度不能是 0——备用入口变成一行后 act 变宽了，
+     basis 0 会让 act 和文字挤在同一行、把文字压成一列字 */
   .exe-offer { gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
-  .exe-offer-body { flex: 1 1 0; }
-  .exe-offer-act { flex-direction: row; align-items: center; gap: 10px; margin-left: 42px; padding-left: 0; }
+  .exe-offer-body { flex: 1 1 150px; }
+  .exe-offer-act { flex-wrap: wrap; flex-direction: row; align-items: center; gap: 8px 12px; margin-left: 42px; padding-left: 0; }
+  .exe-alt-row { justify-content: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
