@@ -89,9 +89,15 @@ and offers the **zero-dependency PowerShell version** as the reliable alternativ
 1. Download `NikkiPhotoCleaner.exe` and double-click it
 2. *Change folder* → pick `X6Game\ScreenShot` (the game root also works, it will find the right subfolder)
 3. *Rescan*
-4. Review the pre-ticked **Deleted** items, tick a few **Unsure** ones if you want
+4. Review the pre-ticked **Deleted** items. The strip above the list shows `N of M selected`
+   plus a *Select all* button — no need to click a hundred circles one by one. `Ctrl+A` works too
 5. *Move to review folder* — files are **moved**, not deleted
 6. Open that folder, check, then delete them yourself
+
+Before anything moves, a confirmation window lists every single file (the list scrolls, so
+hundreds of photos are all there):
+
+![Confirm move](docs/screenshots/move-en.png)
 
 ### 2. PowerShell, zero dependency
 
@@ -223,7 +229,7 @@ and that switching language never splits the data folder (cases 12 and 13).
 Source and issue tracker: <https://github.com/3341284397-max/InfinityNikki-PhotoCleaner>
 
 Code is released under [MIT](LICENSE). The application icon (`src/app/app.ico` — Damiao sweeping up
-photos) was made by the project author and is released under the same MIT license.
+photos) was made by Lyrins and is released under the same MIT license.
 
 The icon ships two framings: head only for 16–48 px, the full illustration at 64 px and above —
 the full scene turns to mush at taskbar size, while the head silhouette still reads.

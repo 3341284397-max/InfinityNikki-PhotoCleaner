@@ -617,14 +617,33 @@ namespace NikkiPhotoCleaner
     //  列表表头（原生表头是系统灰，跟这套配色不搭，改成自绘一条）
     // ============================================================
 
+    /// <summary>
+    /// 开了双缓冲的 ListView。
+    /// 自绘列表默认直接往屏幕 DC 上画，滚动和悬停高亮时上一帧会先被擦掉，
+    /// 肉眼看就是整列文字在闪、像列表在反复刷新。DoubleBuffered 让每一帧先画到内存位图，
+    /// 一次贴上去，闪烁就没有了。
+    /// </summary>
+    internal class BufferedListView : ListView
+    {
+        public BufferedListView()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+            DoubleBuffered = true;
+            UpdateStyles();
+        }
+    }
+
     internal class ListHeader : Control
     {
         public ListView Target;
         private readonly string[] _titles;
         private readonly Font _font;
+        private readonly int _rightFrom;
 
-        public ListHeader(string[] titles)
+        /// <param name="rightFrom">从第几列开始右对齐（主列表是「时间/大小」，对话框里只有「大小」）</param>
+        public ListHeader(string[] titles, int rightFrom = 3)
         {
+            _rightFrom = rightFrom;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             BackColor = Theme.Card;
@@ -654,7 +673,7 @@ namespace NikkiPhotoCleaner
                 // 补了就会和下方同列内容错开，出现「表头的大小跑到最右边」。
                 var w = Target.Columns[i].Width;
                 var cell = new Rectangle(x + 12, 0, Math.Max(0, w - 16), Height);
-                var flags = (i >= 3) ? Theme.RightMid : Theme.LeftMid;
+                var flags = (i >= _rightFrom) ? Theme.RightMid : Theme.LeftMid;
                 Theme.Str(g, _titles[i], _font, Theme.Text3, cell, flags);
                 x += w;
             }

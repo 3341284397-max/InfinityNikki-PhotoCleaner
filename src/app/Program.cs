@@ -58,6 +58,18 @@ namespace NikkiPhotoCleaner
                 RunDialogRealShot(argv[2], argv[3]);
                 return;
             }
+            if (argv.Length >= 3 && argv[1] == "--shotall")
+            {
+                RunSelectAllShot(argv[2], argv.Length >= 4 && argv[3] == "demo");
+                return;
+            }
+            if (argv.Length >= 3 && argv[1] == "--shotmove")
+            {
+                int n;
+                if (!int.TryParse(argv.Length >= 4 ? argv[3] : "40", out n) || n <= 0) n = 40;
+                RunMoveDialogShot(argv[2], n);
+                return;
+            }
 
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
@@ -97,6 +109,44 @@ namespace NikkiPhotoCleaner
                 using (var bmp = new Bitmap(f.Width, f.Height))
                 {
                     f.DrawToBitmap(bmp, new Rectangle(0, 0, f.Width, f.Height));
+                    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 隐藏入口：--shotall 输出.png [demo]
+        /// 打开窗口后先按一次「全选」，再截图 —— 用来确认全选按钮、计数文字与勾选圈同时到位。
+        /// </summary>
+        internal static void RunSelectAllShot(string path, bool demo)
+        {
+            try { SetProcessDPIAware(); } catch { }
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            using (var f = new MainForm())
+            {
+                f.Headless = true;
+                f.DemoMode = demo;
+                f.StartPosition = FormStartPosition.Manual;
+
+                var wa = Screen.PrimaryScreen.WorkingArea;
+                f.Location = new Point(
+                    wa.Left + Math.Max(0, (wa.Width - f.Width) / 2),
+                    wa.Top + Math.Max(0, (wa.Height - f.Height) / 2));
+                f.TopMost = true;
+                f.Show();
+
+                for (var i = 0; i < 10; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(40); }
+
+                f.SelectAllForTest();
+                for (var i = 0; i < 8; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(40); }
+
+                var box = FrameBounds(f);
+                using (var bmp = new Bitmap(box.Width, box.Height))
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.CopyFromScreen(box.Left, box.Top, 0, 0, box.Size);
                     bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
                 }
             }
@@ -186,6 +236,58 @@ namespace NikkiPhotoCleaner
             Application.SetCompatibleTextRenderingDefault(false);
 
             using (var f = new CleanDialog(screenShot))
+            {
+                f.StartPosition = FormStartPosition.Manual;
+                var wa = Screen.PrimaryScreen.WorkingArea;
+                f.Location = new Point(
+                    wa.Left + Math.Max(0, (wa.Width - f.Width) / 2),
+                    wa.Top + Math.Max(0, (wa.Height - f.Height) / 2));
+                f.TopMost = true;
+                f.Show();
+
+                for (var i = 0; i < 16; i++)
+                {
+                    Application.DoEvents();
+                    System.Threading.Thread.Sleep(45);
+                }
+
+                var box = FrameBounds(f);
+                using (var bmp = new Bitmap(box.Width, box.Height))
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.CopyFromScreen(box.Left, box.Top, 0, 0, box.Size);
+                    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 隐藏入口：--shotmove 输出.png [张数]
+        /// 把「确认移动」对话框渲染成 PNG，用来核对滚动列表与各种张数下的高度。
+        /// </summary>
+        internal static void RunMoveDialogShot(string path, int count)
+        {
+            try { SetProcessDPIAware(); } catch { }
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            var t0 = new DateTime(2026, 10, 20, 21, 24, 47);
+            var items = new List<PhotoItem>();
+            for (var i = 0; i < count; i++)
+            {
+                var t = t0.AddMinutes(-37 * i);
+                items.Add(new PhotoItem
+                {
+                    Name = t.ToString("yyyy_MM_dd_HH_mm_ss") + "_" + (2143244 - i * 7),
+                    FullPath = @"D:\Games\X6Game\ScreenShot\" + t.ToString("yyyy_MM_dd_HH_mm_ss") + ".jpeg",
+                    Size = 1180000 + i * 41000L,
+                    Time = t,
+                    Status = (i % 6 == 5) ? StatusText.Suspect : StatusText.Deleted,
+                    MinAgeDays = 2
+                });
+            }
+
+            using (var f = new MoveDialog(items, @"D:\Games\X6Game\ScreenShot\无限暖暖清理助手_待清理照片", 3, 2))
             {
                 f.StartPosition = FormStartPosition.Manual;
                 var wa = Screen.PrimaryScreen.WorkingArea;
@@ -1062,6 +1164,9 @@ namespace NikkiPhotoCleaner
         private PillToggle _chkOnlyPending;
         private ListView _list;
         private ListHeader _listHeader;
+        private Panel _listTools;
+        private Label _lblSel;
+        private SoftButton _btnSelAll;
         private StatCard _statKeep, _statDel, _statSus, _statNew;
         private PictureBox _preview;
         private Label _lblInfo;
@@ -1275,7 +1380,7 @@ namespace NikkiPhotoCleaner
             })
             { Dock = DockStyle.Top, Target = null };
 
-            _list = new ListView
+            _list = new BufferedListView
             {
                 Dock = DockStyle.Fill,
                 View = View.Details,
@@ -1305,12 +1410,53 @@ namespace NikkiPhotoCleaner
 
             _listHeader.Target = _list;
 
+            // 勾选工具条：列表上方一条窄行，左边报数，右边一键勾选全部 / 全部取消。
+            // 上百张照片逐个点勾选圈不现实，得有个总开关。
+            _listTools = new Panel { Dock = DockStyle.Top, Height = S(34), BackColor = Theme.Card };
+
+            _lblSel = new Label
+            {
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = Theme.F(8.4f),
+                ForeColor = Theme.Text3,
+                BackColor = Color.Transparent,
+                Text = ""
+            };
+
+            _btnSelAll = new SoftButton(L10n.T("全选"), BtnKind.Ghost, S(74));
+            _btnSelAll.Font = Theme.F(8.4f);
+            _btnSelAll.Height = S(26);
+            _btnSelAll.PadX = 12;
+            _btnSelAll.FitWidth();
+            _btnSelAll.Click += (s, e) => ToggleSelectAll();
+
+            _listTools.Controls.Add(_lblSel);
+            _listTools.Controls.Add(_btnSelAll);
+            _listTools.Resize += (s, e) => LayoutListTools();
+
             _list.SelectedIndexChanged += (s, e) => ShowPreview();
             _list.DoubleClick += (s, e) => OpenSelectedOriginal();
             _list.MouseUp += ListMouseUp;
             _list.MouseDown += ListMouseDown;
             _list.MouseMove += ListMouseMove;
-            _list.MouseLeave += (s, e) => { if (_hotRow != -1) { _hotRow = -1; _list.Invalidate(); } };
+            _list.MouseLeave += (s, e) =>
+            {
+                if (_hotRow == -1) return;
+                var r = _hotRow;
+                _hotRow = -1;
+                InvalidateRow(r);
+            };
+            _list.KeyDown += (s, e) =>
+            {
+                // Ctrl+A 直接勾选全部，比「先全选行、再点按钮」顺手
+                if (e.Control && e.KeyCode == Keys.A)
+                {
+                    ToggleSelectAll();
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                }
+            };
             _list.DrawColumnHeader += ListDrawHeader;
             _list.DrawItem += ListDrawItem;
             _list.DrawSubItem += ListDrawSubItem;
@@ -1318,6 +1464,7 @@ namespace NikkiPhotoCleaner
 
             listCard.Controls.Add(_list);
             listCard.Controls.Add(_listHeader);
+            listCard.Controls.Add(_listTools);   // 后加的先停靠：工具条在最上面，其次表头，剩下给列表
             _split.Panel1.Controls.Add(listCard);
 
             var previewCard = new CardPanel
@@ -1502,14 +1649,20 @@ namespace NikkiPhotoCleaner
             var scroll = SystemInformation.VerticalScrollBarWidth;
             var fixedW = c0 + c1 + timeW + c4;
 
-            _list.Columns[0].Width = c0;
-            _list.Columns[1].Width = c1;
-            _list.Columns[3].Width = timeW;
-            _list.Columns[4].Width = c4;
+            // 逐列设宽度，每设一次 ListView 就重排一遍并重画；包在 BeginUpdate 里只重画一次
+            _list.BeginUpdate();
+            try
+            {
+                _list.Columns[0].Width = c0;
+                _list.Columns[1].Width = c1;
+                _list.Columns[3].Width = timeW;
+                _list.Columns[4].Width = c4;
 
-            var nameW = _list.ClientSize.Width - fixedW - scroll - 2;
-            if (nameW < 120) nameW = 120;
-            _list.Columns[2].Width = nameW;
+                var nameW = _list.ClientSize.Width - fixedW - scroll - 2;
+                if (nameW < 120) nameW = 120;
+                _list.Columns[2].Width = nameW;
+            }
+            finally { _list.EndUpdate(); }
         }
 
         private void SwitchLanguage()
@@ -1774,7 +1927,8 @@ namespace NikkiPhotoCleaner
                 if (p == null) return;
                 if (_checked.Contains(p.Name)) _checked.Remove(p.Name);
                 else _checked.Add(p.Name);
-                _list.Invalidate(rect);
+                _list.Invalidate(rect);      // 只刷这一行，别整表重画
+                RefreshSelUi();
                 UpdateMoveButtonText();
             }
         }
@@ -1784,8 +1938,21 @@ namespace NikkiPhotoCleaner
             var hit = _list.GetItemAt(e.X, e.Y);
             var idx = hit == null ? -1 : hit.Index;
             if (idx == _hotRow) return;
+
+            // 只重画「刚离开」和「刚进入」两行。以前这里整表 Invalidate，
+            // 鼠标一动整列文字就跟着闪一下，看着像列表在不停刷新。
+            var old = _hotRow;
             _hotRow = idx;
-            _list.Invalidate();
+            InvalidateRow(old);
+            InvalidateRow(idx);
+        }
+
+        private void InvalidateRow(int idx)
+        {
+            if (idx < 0 || idx >= _list.Items.Count) return;
+            var b = _list.Items[idx].Bounds;
+            if (b.Height <= 0) return;
+            _list.Invalidate(new Rectangle(0, b.Top - 1, _list.ClientSize.Width, b.Height + 2));
         }
 
         // ==================== 扫描 ====================
@@ -1911,6 +2078,62 @@ namespace NikkiPhotoCleaner
             LayoutBottom();
         }
 
+        private int S(int v) { return (int)Math.Round(v * (DeviceDpi / 96f)); }
+
+        /// <summary>工具条：按钮贴右，报数靠左吃掉剩下的宽度。</summary>
+        private void LayoutListTools()
+        {
+            if (_listTools == null || _btnSelAll == null || _lblSel == null) return;
+
+            var b = _btnSelAll;
+            var x = _listTools.Width - b.Width - S(2);
+            b.SetBounds(x, (_listTools.Height - b.Height) / 2, b.Width, b.Height);
+            _lblSel.SetBounds(S(4), 0, Math.Max(S(40), x - S(10)), _listTools.Height);
+        }
+
+        /// <summary>刷新「已勾选 12 / 128 张」与全选按钮的措辞。</summary>
+        private void RefreshSelUi()
+        {
+            if (_btnSelAll == null || _lblSel == null) return;
+
+            var total = _view == null ? 0 : _view.Count;
+            var n = total == 0 ? 0 : _view.Count(p => _checked.Contains(p.Name));
+
+            // 当前视野里全勾上了，按钮就变成「取消全选」
+            _btnSelAll.Text = (total > 0 && n >= total) ? L10n.T("取消全选") : L10n.T("全选");
+            _btnSelAll.Enabled = total > 0;
+            _btnSelAll.FitWidth();
+
+            _lblSel.Text = total == 0
+                ? L10n.T("暂无照片")
+                : L10n.F("已勾选 {0} / {1} 张", n, total);
+
+            LayoutListTools();
+        }
+
+        /// <summary>
+        /// 全选 / 取消全选。只作用于当前筛选出来的行 ——
+        /// 被「只看待清理」藏起来的那批照片，不应该被这个按钮顺手勾上。
+        /// </summary>
+        /// <summary>给截图/自检入口用：等价于点一下「全选」按钮。</summary>
+        internal void SelectAllForTest() { ToggleSelectAll(); }
+
+        private void ToggleSelectAll()
+        {
+            if (_view == null || _view.Count == 0) return;
+
+            var all = _view.Count(p => _checked.Contains(p.Name)) >= _view.Count;
+            foreach (var p in _view)
+            {
+                if (all) _checked.Remove(p.Name);
+                else _checked.Add(p.Name);
+            }
+
+            _list.Invalidate();     // 双缓冲下这一下就够了，不用逐行刷
+            RefreshSelUi();
+            UpdateMoveButtonText();
+        }
+
         private void UpdateStat()
         {
             if (_result == null) return;
@@ -1958,6 +2181,7 @@ namespace NikkiPhotoCleaner
             _btnOpenPending.Enabled = true;
             _btnRestore.Enabled = true;
             UpdateMoveButtonText();
+            RefreshSelUi();
         }
 
         private void AutoFitColumns()
@@ -2077,23 +2301,15 @@ namespace NikkiPhotoCleaner
             }
 
             var pending = Mover.PendingDir(_screenShot);
-            var listText = string.Join("\n", target.Take(12)
-                .Select(p => L10n.F("· {0}　[{1}]", p.Name, StatusText.Name(p.Status))));
-            var moreText = target.Count > 12 ? "\n" + L10n.F("… 以及另外 {0} 张", target.Count - 12) : "";
-
-            var text = L10n.F(
-                "将把下面 {0} 张照片移入：\n{1}\n\n{2}{3}\n\n这只是【移动】，不是删除。移动后文件夹会自动打开，你核对完可以 Ctrl+A 全选、按 Delete 真正删除。\n移错了点「移回原目录」可以全部移回。",
-                target.Count, pending, listText, moreText);
-
             var tooNew = target.Count(p => p.Status == StatusText.TooNew);
-            if (tooNew > 0)
-                text += L10n.F("\n\n注意：其中 {0} 张拍摄不足 {1} 天，可能只是还没同步到游戏相册。移动前请再看一眼，不需要的话点「取消」回列表取消勾选。",
-                               tooNew, MinAgeDays);
 
-            text += L10n.T("\n\n继续吗？");
-
-            if (MessageBox.Show(this, text, L10n.T("确认移动"), MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
-                return;
+            // 以前用 MessageBox：名字最多列 12 个，再多就只剩「以及另外 N 张」。
+            // 一次上百张时，第 13 张往后根本没法核对，而那时恰恰最该看一眼。
+            // 改成带滚动列表的窗口，有多少列多少，窗口高度不跟着涨。
+            using (var dlg = new MoveDialog(target, pending, tooNew, MinAgeDays))
+            {
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            }
 
             var r = Mover.Move(target, _screenShot);
             if (!r.Ok)
