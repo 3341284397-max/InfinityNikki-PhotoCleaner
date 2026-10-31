@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 **[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
 
-**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
+**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
 
 A third option: [Baidu Wangpan](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) — code `1111`. It holds the full bundle (exe + Chinese readme + screenshots + the dependency-free fallback), which is the one to use when neither code host is reachable.
 
@@ -29,7 +29,7 @@ moves them aside, and lets you press Delete yourself.
 
 ---
 
-## Four statuses
+## Five statuses
 
 | Status | Meaning | Colour |
 |---|---|---|
@@ -37,6 +37,7 @@ moves them aside, and lets you press Delete yourself.
 | **Deleted** | Was seen in the album before, and is gone from the cache now | clay |
 | **Unsure** | Not in the album cache, and the tool has never seen it (old files, or first scan after install) | amber |
 | **Too new** | Would be Deleted/Unsure, but modified less than 3 days ago — recent screenshots are never auto-selected | grey |
+| **Ignored** | You tagged it "leave this alone". Excluded from ticking, counts and moving | light grey |
 
 Evidence comes from two places:
 
@@ -44,9 +45,71 @@ Evidence comes from two places:
 - **Local ledger** — `album-ledger.tsv`, written by the tool, recording "this file was once in the album"
 
 "Deleted" requires **both** conditions: was in the album, and is not any more.
-Only this status is pre-ticked. "Unsure" is never auto-selected, because it is the one most likely to be wrong.
+**Nothing is ever pre-ticked** — ticking is always your action, never the tool's.
 
 ---
+
+## How it works
+
+### What a scan actually does
+
+The tool reads two places and writes to neither of them: **the file names in the album cache**, and **the files in `ScreenShot`**. Then it asks three questions of every local file:
+
+```
+X6Game/ScreenShot/xxx.jpeg
+  │
+  ├─ ① Is the name in the album cache? ──── yes ──→ [In album] visible in game, leave it
+  │
+  └─ no ↓
+       ├─ ② Does the ledger say it was once in the album? ── yes ──→ [Deleted]
+       │                                        you deleted it in game, the file is still here
+       └─ never recorded ↓
+            └─→ [Unsure] the tool has no history for it — deleted, or just not synced yet
+```
+
+The third question ("too new") stacks on top of ① and ②: anything not in the album and modified less than three days ago is demoted to "Too new" and left alone.
+
+### The ledger: why the first run flags nothing
+
+The only way to tell "you deleted this in game" is **comparison**: it was in the album, and now it isn't. On the first run the tool has no "before" — it has never seen any photo.
+
+So the first scan does one thing: **it builds a ledger**. Every file currently in the album gets written to `相册台账.tsv` / `album-ledger.tsv` (name, first seen, last seen, size). Everything not in the album can only be "Unsure" that round.
+
+Delete a few photos in game, hit Rescan, and now "Deleted" appears.
+
+**The ledger also stores file size.** File names get reused on disk: when a "Deleted" photo is replaced by a new screenshot with the same name, the size is almost certainly different. On a size mismatch the old record is discarded and the file is judged from scratch — otherwise the new photo would inherit "was once in the album" and be flagged Deleted, ready to be swept away by one click.
+
+### Imported photos: backups copied back from a USB stick
+
+Copy an old backup back into `ScreenShot` and the file names match the ledger exactly, so they get flagged "Deleted" — even though you never deleted them in game.
+
+The tool spots them by **timestamp**:
+
+> A game screenshot is finished the moment it is written — creation time and modified time are the same.
+> A file copied in from a USB stick, a cloud drive or another PC keeps its **modified time**, but gets a **creation time of the moment it was copied**.
+
+So `creation − modified > 1 hour` is flagged **Imported**. The test is one-sided: copying only ever pushes creation later than modification; editing in an image app does the opposite, so it cannot false-positive.
+
+"Imported" is a **tag**, not a status — it never overwrites the verdict. The list shows both badges at once, because you need to know *what it would have been* as well as *why it is excluded*. Imported photos are never ticked, never counted as pending, and never picked up by Select all.
+
+The test is not perfect: some copy tools, and moves on FAT32, preserve the creation time. That is exactly why manual tags exist.
+
+### Manual tags: when the program cannot be sure
+
+"Ignore" in the toolbar is the final say. Ignored photos leave ticking, counts and moving entirely; "Un-ignore" puts them back at any time.
+
+Tags live in `user-marks.tsv`, deliberately separate from the ledger — the ledger is *what the program observed* (safe to delete and rebuild), tags are *what you said* (only you change them). The key is **file name + size**: same name with a different size means a different photo on disk, and the old tag does not apply. The direction is intentional — better to miss one ignore than to ignore a photo that should have been cleaned.
+
+Before every change the previous version is kept as `user-marks.tsv.bak`.
+
+### What this program never does
+
+- **It never deletes a file.** There is no delete call in the codebase; "move" is `File.Move`. The actual deletion is always you pressing Delete in Explorer.
+- **It never goes online.** No network calls, no account, no telemetry.
+- **It never guesses.** Anything uncertain becomes "Unsure", and "Unsure" is never auto-selected.
+
+---
+
 
 ## Requirements
 
@@ -188,6 +251,7 @@ Created next to the executable:
 | Data folder | `无限暖暖清理助手_使用数据` | `NikkiCleaner_Data` |
 | Review folder | `无限暖暖清理助手_待清理照片` | `NikkiCleaner_ToDelete` |
 | Album ledger | `相册台账.tsv` | `album-ledger.tsv` |
+| Your tags | `用户标记.tsv` (auto `.bak` before each change) | `user-marks.tsv` |
 | Reports | `网页报告/` | `reports/` |
 | Settings | `设置.txt` | `settings.txt` |
 | Move record | `最近一次移动记录.txt` | `last-move.txt` |
@@ -220,7 +284,7 @@ dotnet build -c Release
 ```
 src/app/        C# WinForms sources (Program.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs)
 src/scripts/    Zero-dependency PowerShell version (lang/PhotoSync.en.ps1 holds the English strings)
-src/test/       Regression host (net8); run-tests.sh covers 13 cases
+src/test/       Regression host (net8); run-tests.sh covers 17 cases
 web/            Static web version (index.html / styles.css / app.js)
 package/        Four double-click .bat launchers, in Chinese and English
 src/pack/       Builds the share package for cloud drives (exe + 使用说明.txt + screenshots)
@@ -234,7 +298,8 @@ cd src/test && ./run-tests.sh
 ```
 
 Covers the status state machine, the "too new" threshold, ledger I/O, move and restore, record cleanup,
-and that switching language never splits the data folder (cases 12 and 13).
+that switching language never splits the data folder (cases 12 and 13), imported-photo detection and tag
+persistence (14–16), and that a same-name/different-size file invalidates its ledger entry (17).
 
 ## Known limitations
 

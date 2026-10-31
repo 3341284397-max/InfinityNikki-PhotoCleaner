@@ -63,6 +63,27 @@ namespace NikkiPhotoCleaner
                 case "survey":
                     Console.Write(Survey(args[1]));
                     return 0;
+
+                case "tag":
+                    // tag <ss>：列出每张的状态与标记，并给出汇总，
+                    // 用来断言「外部导入」「已忽略」是否按预期生效
+                    Console.Write(Tag(args[1]));
+                    return 0;
+
+                case "ignore":
+                    // ignore <ss> [name...]：不给名字就是全部标记
+                    Console.Write(SetIgnore(args[1], args.Skip(2).ToArray(), true));
+                    return 0;
+
+                case "unignore":
+                    Console.Write(SetIgnore(args[1], args.Skip(2).ToArray(), false));
+                    return 0;
+
+                case "mkexternal":
+                    // mkexternal <ss> <name>：把文件改成「外部拷入」的时间特征
+                    // （修改时间留在过去、创建时间是现在），模拟从 U 盘拷回来的备份
+                    Console.Write(MakeExternal(args[1], args[2]));
+                    return 0;
             }
 
             Console.WriteLine("未知命令: " + args[0]);
@@ -174,6 +195,63 @@ namespace NikkiPhotoCleaner
                 sb.AppendLine(string.Format("{0,-8} 数量={1,-4} 大小={2,-10} 危险={3,-6} {4}",
                     i.Key, i.Count, RecordCleaner.Size(i.Bytes), i.Risky, i.Note));
             return sb.ToString();
+        }
+
+        /// <summary>每张的状态 + 标记，末尾给一行汇总，方便脚本里 grep 断言。</summary>
+        private static string Tag(string ss)
+        {
+            var r = Scanner.Run(ss, 0);
+            var sb = new StringBuilder();
+            foreach (var p in r.Items)
+            {
+                var tags = p.External && p.Ignored ? "外部导入+已忽略"
+                         : p.External ? "外部导入"
+                         : p.Ignored ? "已忽略"
+                         : "";
+                sb.AppendLine("  " + StatusText.Name(p.Status).PadRight(6) +
+                              p.Name + (tags.Length > 0 ? "  [" + tags + "]" : ""));
+            }
+            sb.AppendLine("counts=InAlbum:" + r.Items.Count(p => p.Status == StatusText.InAlbum) +
+                          " Deleted:" + r.Items.Count(p => p.Status == StatusText.Deleted) +
+                          " Suspect:" + r.Items.Count(p => p.Status == StatusText.Suspect) +
+                          " TooNew:" + r.Items.Count(p => p.Status == StatusText.TooNew) +
+                          " Ignored:" + r.Items.Count(p => p.Status == StatusText.Ignored) +
+                          " External:" + r.Items.Count(p => p.External) +
+                          " Excluded:" + r.Items.Count(p => p.Excluded) +
+                          " Marks:" + (r.Marks == null ? 0 : r.Marks.Count));
+            sb.AppendLine("闸门=" + (r.Blockers.Count == 0 ? "无" : string.Join(" / ", r.Blockers)));
+            return sb.ToString();
+        }
+
+        private static string SetIgnore(string ss, string[] names, bool on)
+        {
+            var r = Scanner.Run(ss, 0);
+            var marks = MarkStore.Load();
+
+            var targets = r.Items
+                .Where(p => names.Length == 0 || names.Contains(p.Name, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            foreach (var p in targets) marks.SetIgnore(p.Name, p.Size, on);
+            marks.Save();
+
+            var after = Scanner.Run(ss, 0);
+            var sb = new StringBuilder();
+            sb.AppendLine("操作=" + (on ? "标记忽略" : "取消忽略") + " 命中=" + targets.Count);
+            sb.AppendLine("Ignored=" + after.Items.Count(p => p.Status == StatusText.Ignored) +
+                          " Marks=" + (after.Marks == null ? 0 : after.Marks.Count));
+            sb.AppendLine("备份文件=" + (File.Exists(AppPaths.MarkPath + ".bak") ? "有" : "无"));
+            return sb.ToString();
+        }
+
+        private static string MakeExternal(string ss, string name)
+        {
+            var full = Path.Combine(ss, name);
+            if (!File.Exists(full)) return "文件不存在: " + full + "\n";
+
+            File.SetLastWriteTime(full, DateTime.Now.AddDays(-10));
+            File.SetCreationTime(full, DateTime.Now);   // 创建时间=现在，修改时间=10 天前
+            return "已改为外部导入特征: " + name +
+                   "  差值=" + (File.GetCreationTime(full) - File.GetLastWriteTime(full)).TotalHours.ToString("0.0") + " 小时\n";
         }
     }
 }

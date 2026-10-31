@@ -151,6 +151,9 @@ namespace NikkiPhotoCleaner
                     bg = ClaySoft; fore = ClayDark; border = ClayLine; return;
                 case StatusText.Suspect:
                     bg = AmberSoft; fore = AmberDeep; border = AmberLine; return;
+                case StatusText.Ignored:
+                    // 中性灰，比「太新」再淡一档：它代表「程序不再管这张了」，不该有任何情绪色
+                    bg = LineSoft; fore = Text2; border = Line; return;
                 default:
                     bg = Color.FromArgb(0xF0, 0xF0, 0xEC);
                     fore = Text3;
@@ -362,10 +365,18 @@ namespace NikkiPhotoCleaner
         private string _count = "0";
         private string _label = "";
         private Color _accent = Theme.Green;
+        private bool _hover;
 
         public string Count { get { return _count; } set { _count = value ?? "0"; Invalidate(); } }
         public string Label { get { return _label; } set { _label = value ?? ""; Invalidate(); } }
         public Color Accent { get { return _accent; } set { _accent = value; Invalidate(); } }
+
+        /// <summary>可点击时给出悬停反馈，让「点卡片＝批量勾选」这件事自己能说明白。</summary>
+        public bool Hoverable
+        {
+            get;
+            set;
+        }
 
         public StatCard()
         {
@@ -375,6 +386,22 @@ namespace NikkiPhotoCleaner
             DoubleBuffered = true;
         }
 
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            if (!Hoverable) return;
+            _hover = true;
+            Invalidate();
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (!Hoverable) return;
+            _hover = false;
+            Invalidate();
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
@@ -382,7 +409,7 @@ namespace NikkiPhotoCleaner
             using (var b = new SolidBrush(BackColor)) g.FillRectangle(b, ClientRectangle);
 
             var r = new Rectangle(0, 0, Width - 1, Height - 1);
-            Theme.DrawRound(g, r, Theme.R, Theme.Card, Theme.Line);
+            Theme.DrawRound(g, r, Theme.R, Theme.Card, _hover ? Theme.GreenLine : Theme.Line);
 
             // 左侧色条
             var barH = Math.Max(10, Height - 26);

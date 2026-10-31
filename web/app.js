@@ -19,7 +19,7 @@
      国内 CDN 走 Gitee，GitHub 当备用。
      文案里的 <a class="exe-link"> 统一由 relinkExe() 补地址；index.html 里写死的
      href 则是没有 JS 时的兜底，改地址时两边都要动。 */
-  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe';
+  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe';
   var EXE_URL_ALT = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
   /* 第三个入口：网盘整包（exe + GBK 中文说明 + 截图 + 零依赖版）。
      两个代码托管都连不上、或想要一份「给人看」的说明时用它。
@@ -69,6 +69,8 @@
       'ws.search': '搜索文件名',
       'ws.scanning': '扫描中…',
       'ws.selDel': '勾选全部已删',
+      'notice.pick.t': '这些照片可以先挑出来',
+      'notice.pick.b': '点上面的「勾选全部已删」，或在照片上逐张点选。工具不会替你勾任何一张。',
       'ws.clear': '取消勾选',
       'ws.selected': '张已勾选',
       'ws.copy': '复制文件名',
@@ -187,6 +189,8 @@
       'ws.search': 'Search file name',
       'ws.scanning': 'Scanning...',
       'ws.selDel': 'Select all deleted',
+      'notice.pick.t': 'Some photos are ready to be picked',
+      'notice.pick.b': 'Use "Select all deleted" above, or tick photos one by one. Nothing is ever pre-selected.',
       'ws.clear': 'Clear selection',
       'ws.selected': 'selected',
       'ws.copy': 'Copy file names',
@@ -505,8 +509,9 @@
     state.items = items;
     state.byName = new Map();
     items.forEach(function (it) { state.byName.set(it.name, it); });
+    // 1.7.0 起不再自动勾选：从 U 盘拷回来的备份文件名和台账一致，
+    // 同样会被判成「已删除」，一扫描就整批预选、点一下就把备份搬走了。
     state.selected = new Set();
-    items.forEach(function (it) { if (it.status === STATUS.Deleted) state.selected.add(it.name); });
 
     enterWorkspace();
     el.dirName.textContent = state.dir.name;
@@ -527,6 +532,9 @@
       gate = ['notice.first.t', 'notice.first.b'];
     } else if (total >= 5 && (del + sus) / total > 0.7) {
       gate = ['notice.ratio.t', 'notice.ratio.b'];
+    } else if (del > 0 && state.selected.size === 0) {
+      // 1.7.0 起不再预勾选，这里得说一句「下一步做什么」，否则用户面对一屏照片会停在原地
+      gate = ['notice.pick.t', 'notice.pick.b'];
     }
 
     if (!gate) { el.notice.hidden = true; return; }
@@ -606,6 +614,7 @@
     var card = el.grid.querySelector('[data-name="' + CSS.escape(name) + '"]');
     if (card) card.classList.toggle('is-selected', state.selected.has(name));
     updateActionBar();
+    updateNotice();   // 「这些照片可以先挑出来」在勾第一张之后就该消失
   }
 
   function updateActionBar() {
@@ -973,7 +982,6 @@
       state.byName = new Map();
       items.forEach(function (it) { state.byName.set(it.name, it); });
       state.selected = new Set();
-      items.forEach(function (it) { if (it.status === STATUS.Deleted) state.selected.add(it.name); });
       state.albumDirs = 3;
       state.firstRun = false;
       state.isDemo = true;
@@ -1158,11 +1166,13 @@
         if (i.status !== STATUS.InAlbum) state.selected.add(i.name);
       });
       render();
+      updateNotice();
     });
 
     el.btnClear.addEventListener('click', function () {
       state.selected.clear();
       render();
+      updateNotice();
     });
 
     el.btnCopy.addEventListener('click', copyNames);

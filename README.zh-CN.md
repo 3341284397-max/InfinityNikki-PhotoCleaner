@@ -6,9 +6,9 @@
 
 简体中文 | [English](README.md)
 
-**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
+**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
 
-**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.6.0/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
+**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
 
 **GitHub 打不开或太慢？** 仓库在 Gitee 有一份国内镜像：[gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner)，exe 直链下载无需登录。两个仓库内容一致，issue 提在哪边都会看。
 
@@ -29,7 +29,7 @@
 
 ---
 
-## 四种判定
+## 五种判定
 
 | 判定 | 含义 | 颜色 |
 |---|---|---|
@@ -37,14 +37,76 @@
 | **已删除** | 曾经在相册里出现过，现在相册缓存里已经没有了 | 赭红 |
 | **疑似** | 相册缓存里没有，工具也从没见过它（旧照片，或新装工具后的首次扫描） | 琥珀 |
 | **太新** | 属于「已删除 / 疑似」，但修改时间不足 3 天——刚截的图不参与判定，避免误伤 | 灰 |
+| **已忽略** | 你手工标记过「这张不用管」，不参与勾选、统计与移动 | 浅灰 |
 
 判定依据来自两处：
 
 - **相册缓存名单**：`X6Game/Saved/GamePlayPhotos/*/NikkiPhotos_*` 下的文件名
 - **本地台账**：工具自己记的 `album-ledger.tsv`，记录「这张照片曾经在册」
 
-「已删除」需要**曾经在册、现在不在**两个条件同时成立。只有这一条会默认勾选，
-「疑似」永远需要你手动勾——因为它最可能是误判。
+「已删除」需要**曾经在册、现在不在**两个条件同时成立。**任何一张都不会被默认勾选**——
+勾选永远是你的动作，工具不替你做决定。
+
+---
+
+## 工作原理
+
+### 一次扫描到底做了什么
+
+工具只读两处、不写游戏目录：**相册缓存里的文件名**，和 `ScreenShot` 目录里的文件。然后对每个本地文件问三个问题：
+
+```
+X6Game/ScreenShot/xxx.jpeg
+  │
+  ├─ ① 文件名在相册缓存里？──── 在 ──→ 【在册】游戏里还看得见，不动它
+  │
+  └─ 不在 ↓
+       ├─ ② 台账记过「它曾经在册」？── 记过 ──→ 【已删除】
+       │                                     游戏里删了，本地还留着
+       └─ 没记过 ↓
+            └─→ 【疑似】工具没见过它，可能删过、也可能还没同步
+```
+
+第三个问题（是否「太新」）在①②之后叠加：只要不在相册里，且文件修改时间不足 3 天，一律降级成「太新」暂不处理。
+
+### 台账：为什么第一次用一张都勾不出来
+
+判断「游戏里删了」的唯一依据是**对比**：它以前在相册里，现在不在了。可第一次运行时，工具还没见过任何照片，没有「以前」。
+
+所以首次扫描只做一件事——**建档**。它把当前在相册里的照片记进 `相册台账.tsv`（文件名、首次见到、最后见到、文件大小），这一轮所有「相册里没有」的照片只能是「疑似」。
+
+去游戏里删几张，回来点「重新扫描」，那时台账里已经有记录了，才会出现「已删除」。
+
+**台账里还存了文件大小。** 因为硬盘上的文件名可能被复用：一张「已删除」的照片被同名新截图顶替时，新文件大小几乎一定不同。工具发现大小对不上，就把旧档案作废、当新文件重新判断——否则新照片会白捡一条「曾经在册」的记录，被判成「已删除」然后被你一键移走。
+
+### 外部导入：从 U 盘拷回来的照片
+
+如果你把历史备份拷回 `ScreenShot`，它们的文件名和台账里一模一样，会被判成「已删除」——但它们其实是你在游戏里**从未删过**的照片（游戏里压根没这些记录，或者你早就删了相册引用但备份还在）。
+
+工具用**时间戳**把它们挑出来：
+
+> 游戏截图是「写完即定稿」——创建时间和修改时间几乎相同。
+> 从 U 盘 / 网盘 / 另一台机器拷进来的文件，**修改时间保留原值，创建时间变成拷贝那一刻**。
+
+于是 `创建时间 − 修改时间 > 1 小时` 就判为「外部导入」。这个判据是单边的：拷入只会让创建时间晚于修改时间；用图片软件改图则是修改时间变新，方向相反，不会误中。
+
+「外部导入」是**标签**，不覆盖原判定。列表里会同时显示「已删除」和「外部导入」徽章——你需要同时知道「它本来会被判成什么」和「为什么被排除」。这类照片默认不勾选、不计入待删统计、不会被「全选」选中。
+
+判据不完美：某些拷贝工具或 FAT32 直接移动会保留创建时间，那时它会漏判。这就是手工标记存在的理由。
+
+### 手工标记：程序猜不准的时候
+
+工具栏的「标记忽略」给用户一个最终裁决权。被标记的照片变成「已忽略」，**不参与勾选、统计、移动**；「取消忽略」随时还原。
+
+标记存在 `用户标记.tsv` 里，和台账分开——台账是「程序观察到的事实」（可以整份删掉重建），标记是「你说的话」（只有你能改）。key 用**文件名 + 文件大小**：同名但大小变了，说明硬盘上已经是另一张照片，旧标记不会套到它头上。这个方向是安全的——宁可漏掉一条忽略，也不要误忽略一张本该清理的照片。
+
+每次改动前，上一版会自动存成 `用户标记.tsv.bak`，标错了还能捡回来。
+
+### 这个程序永远不会做的事
+
+- **不删文件。** 代码里没有删除照片的语句，「移动」就是 `File.Move`。真正的删除永远由你在资源管理器里按 Delete。
+- **不联网。** 没有任何网络请求，没有账号、没有统计。
+- **不猜。** 判不准的一律交给「疑似」，且「疑似」永远不自动勾选。
 
 ---
 
@@ -184,6 +246,7 @@ exe 没有代码签名，Windows 可能以两种方式拦截，处理办法不�
 | 数据目录 | `无限暖暖清理助手_使用数据` | `NikkiCleaner_Data` |
 | 待清理文件夹 | `无限暖暖清理助手_待清理照片` | `NikkiCleaner_ToDelete` |
 | 相册台账 | `相册台账.tsv` | `album-ledger.tsv` |
+| 用户标记 | `用户标记.tsv`（改前自动存 `.bak`） | `user-marks.tsv` |
 | 网页报告 | `网页报告/` | `reports/` |
 | 设置 | `设置.txt` | `settings.txt` |
 | 移动记录 | `最近一次移动记录.txt` | `last-move.txt` |
@@ -216,7 +279,7 @@ dotnet build -c Release
 ```
 src/app/        C# WinForms 源码（Program.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs）
 src/scripts/    PowerShell 零依赖版（含 lang/PhotoSync.en.ps1 英文语言表）
-src/test/       回归测试宿主（net8），run-tests.sh 共 13 个用例
+src/test/       回归测试宿主（net8），run-tests.sh 共 17 个用例
 web/            网页版（index.html / styles.css / app.js），纯静态
 package/        四个双击即用的 .bat 启动器（中英各四个）
 src/pack/       打「网盘分享包」：exe + 使用说明.txt + 截图 + 零依赖版
@@ -229,8 +292,9 @@ docs/           截图
 cd src/test && ./run-tests.sh
 ```
 
-覆盖：四种判定的时序、太新阈值、台账读写、移动与还原、记录清理、
-中英文切换时数据目录不分裂（用例 12、13）。
+覆盖：五种判定的时序、太新阈值、台账读写、移动与还原、记录清理、
+中英文切换时数据目录不分裂（用例 12、13）、外部导入识别与忽略标记的持久化（14–16）、
+同名不同大小的台账作废（17）。
 
 ## 已知限制
 

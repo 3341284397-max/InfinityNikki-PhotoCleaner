@@ -156,5 +156,80 @@ fi
 [ "$FAIL" = "0" ] && echo "  用例 13 通过" || echo "  用例 13 失败"
 
 echo
-echo "全部用例执行完毕。测试目录：$ROOT"
+echo "========== 14-17. 标记体系（外部导入 / 忽略 / 同名不同大小）=========="
+TAG="$(pwd)/_tmp_tag"
+rm -rf "$TAG"
+mkdir -p "$TAG/无限暖暖清理助手_使用数据"
+mkdir -p "$TAG/X6Game/ScreenShot" "$TAG/X6Game/Saved/GamePlayPhotos/999/NikkiPhotos_HighQuality"
+TS="$TAG/X6Game/ScreenShot"
+TA="$TAG/X6Game/Saved/GamePlayPhotos/999/NikkiPhotos_HighQuality"
+
+A="2026_10_01_10_00_01_1000001.jpeg"
+B="2026_10_01_10_00_02_1000002.jpeg"
+D="2026_10_01_10_00_04_1000004.jpeg"
+
+# A、B 先在相册里；D 也在册，稍后用来测「同名不同大小」
+for n in $A $B $D; do
+  cp "$SAMPLE" "$TS/$n"
+  cp "$TS/$n" "$TA/$n"
+done
+
+export NIKKI_TOOL_ROOT="$TAG"
+run tag "$TS" > /dev/null         # 第 1 轮：建立台账，三张都记成「曾在相册」
+
+# 模拟：游戏里删掉 B，同时用户从 U 盘把 B 的备份拷回来（创建时间晚于修改时间）
+rm -f "$TA/$B"
+run mkexternal "$TS" "$B" > /dev/null
+# 模拟：游戏里删掉 D
+rm -f "$TA/$D"
+
+echo "--- 第 2 轮扫描（A 在册 / B 已删+外部导入 / D 已删）---"
+OUT=$(run tag "$TS")
+echo "$OUT" | sed 's/^/  /'
+
+grep -q "counts=.*External:1" <<< "$OUT" \
+  && echo "  [OK] 外部导入识别出 1 张" \
+  || { echo "  [FAIL] 外部导入没识别出来"; FAIL=1; }
+grep -q "counts=.*Excluded:1" <<< "$OUT" \
+  && echo "  [OK] 被排除 1 张" \
+  || { echo "  [FAIL] 排除数不对"; FAIL=1; }
+grep -q "$B .*外部导入" <<< "$OUT" \
+  && echo "  [OK] B 同时是「已删除」和「外部导入」" \
+  || { echo "  [FAIL] B 的标记不对"; FAIL=1; }
+
+echo "--- 15. 标记忽略 B ---"
+M1=$(run ignore "$TS" "$B")
+echo "$M1" | sed 's/^/  /'
+grep -q "Ignored=1" <<< "$M1" \
+  && echo "  [OK] B 变成已忽略" \
+  || { echo "  [FAIL] 忽略没生效"; FAIL=1; }
+grep -q "备份文件=无" <<< "$M1" \
+  && echo "  [OK] 首次创建标记文件，没有旧版可备份（符合预期）" \
+  || { echo "  [FAIL] 首次就不该有 .bak"; FAIL=1; }
+
+echo "--- 16. 取消忽略 B ---"
+M2=$(run unignore "$TS" "$B")
+echo "$M2" | sed 's/^/  /'
+grep -q "Ignored=0" <<< "$M2" \
+  && echo "  [OK] 取消忽略后恢复原判定" \
+  || { echo "  [FAIL] 取消失败"; FAIL=1; }
+grep -q "备份文件=有" <<< "$M2" \
+  && echo "  [OK] 改动前把上一版留成了 .bak" \
+  || { echo "  [FAIL] 第二次改动没备份"; FAIL=1; }
+
+echo "--- 17. 同名但大小不同：台账条目必须作废 ---"
+SZ1=$(stat -c %s "$TS/$D")
+head -c 300000 "$SAMPLE" > "$TS/$D"     # 同名、内容/大小都不同
+SZ2=$(stat -c %s "$TS/$D")
+echo "  D 原大小=$SZ1 新大小=$SZ2"
+OUT3=$(run tag "$TS")
+grep -q "$D" <<< "$OUT3" && echo "$OUT3" | grep "$D" | sed 's/^/  /'
+grep -q "疑似.*$D" <<< "$OUT3" \
+  && echo "  [OK] 同名新文件没继承「已删除」，退成疑似" \
+  || { echo "  [FAIL] 同名新文件继承了旧台账（这是数据安全问题）"; FAIL=1; }
+
+unset NIKKI_TOOL_ROOT
+
+echo
+echo "全部用例执行完毕。测试目录：$ROOT 与 $TAG"
 exit $FAIL

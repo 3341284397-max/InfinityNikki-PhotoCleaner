@@ -17,9 +17,9 @@
     <Description>Finds photos you deleted in-game that are still on disk. Never deletes anything itself.</Description>
     <Company>Lyrins</Company>
     <Copyright>Copyright (c) 2026 Lyrins. MIT License.</Copyright>
-    <Version>1.6.0</Version>
-    <AssemblyVersion>1.6.0.0</AssemblyVersion>
-    <FileVersion>1.6.0.0</FileVersion>
+    <Version>1.7.0</Version>
+    <AssemblyVersion>1.7.0.0</AssemblyVersion>
+    <FileVersion>1.7.0.0</FileVersion>
     <Deterministic>true</Deterministic>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>

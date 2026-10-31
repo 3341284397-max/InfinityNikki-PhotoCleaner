@@ -64,7 +64,9 @@ def build(ver):
     # 2. 使用说明：UTF-8 模板 → GBK + CRLF
     text = open(NOTE_SRC, encoding='utf-8').read()
     text = text.replace('\r\n', '\n').replace('\n', '\r\n')
-    text = text.replace('v1.6.0', 'v' + ver)          # 模板里写死的版本号
+    # 模板里的版本号会跟着每次发版前移，写死替换迟早失效；
+    # 统一用正则把标题行那个 vX.Y.Z 换掉，发版脚本才不用跟着改
+    text = re.sub(r'v\d+\.\d+\.\d+', 'v' + ver, text, count=1)
     try:
         raw = text.encode('gbk')
     except UnicodeEncodeError as e:

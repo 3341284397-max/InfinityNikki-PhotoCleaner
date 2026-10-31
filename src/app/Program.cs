@@ -40,7 +40,8 @@ namespace NikkiPhotoCleaner
             }
             if (argv.Length >= 3 && argv[1] == "--shot")
             {
-                RunShot(argv[2], argv.Length >= 4 && argv[3] == "demo");
+                RunShot(argv[2], argv.Length >= 4 && argv[3] == "demo",
+                        argv.Length >= 5 && argv[4] == "scroll");
                 return;
             }
             if (argv.Length >= 4 && argv[1] == "--shotdlg")
@@ -89,7 +90,7 @@ namespace NikkiPhotoCleaner
         /// 隐藏入口：--shot 输出.png [demo]
         /// 把窗口画成 PNG，用来核对界面改动。demo 会灌 12 条假数据，不开游戏也能看效果。
         /// </summary>
-        internal static void RunShot(string path, bool demo)
+        internal static void RunShot(string path, bool demo, bool scrollEnd = false)
         {
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
@@ -105,6 +106,9 @@ namespace NikkiPhotoCleaner
                 Application.DoEvents();
                 System.Threading.Thread.Sleep(300);
                 Application.DoEvents();
+
+                // 「已忽略」排在列表最底层，屏幕高度截不到，需要时先滚到底
+                if (scrollEnd) f.ScrollListToEndForTest();
 
                 using (var bmp = new Bitmap(f.Width, f.Height))
                 {
@@ -535,6 +539,9 @@ namespace NikkiPhotoCleaner
         public static readonly string ConfigPath = Path.Combine(DataDir, DataIsEnglish ? "settings.txt" : "设置.txt");
         public static readonly string LastMovePath = Path.Combine(DataDir, DataIsEnglish ? "last-move.txt" : "最近一次移动记录.txt");
 
+        /// <summary>用户对单张照片的手工标记（忽略 / 确认是游戏截图）。</summary>
+        public static readonly string MarkPath = Path.Combine(DataDir, DataIsEnglish ? "user-marks.tsv" : "用户标记.tsv");
+
         /// <summary>待清理文件夹名。已存在哪个用哪个，避免切换语言后「看不见」之前归拢的照片。</summary>
         public static string PendingFolderName
         {
@@ -604,6 +611,8 @@ namespace NikkiPhotoCleaner
         public const string Deleted = "Deleted";
         public const string Suspect = "Suspect";
         public const string TooNew  = "TooNew";
+        /// <summary>用户手工标了「忽略」。优先级最高，会盖掉其他判定。</summary>
+        public const string Ignored = "Ignored";
 
         public static string Name(string s)
         {
@@ -613,6 +622,7 @@ namespace NikkiPhotoCleaner
                 case Deleted: return L10n.T("已删除");
                 case Suspect: return L10n.T("疑似");
                 case TooNew:  return L10n.T("太新");
+                case Ignored: return L10n.T("已忽略");
                 default:      return s;
             }
         }
@@ -625,6 +635,7 @@ namespace NikkiPhotoCleaner
                 case InAlbum: return L10n.T("游戏相册中仍存在");
                 case Deleted: return L10n.T("曾出现在相册中，现已从相册缓存消失");
                 case TooNew:  return L10n.F("拍摄不足 {0} 天，可能还没同步到相册；要清理请手动勾选", minAgeDays);
+                case Ignored: return L10n.T("你标记了「忽略」，不参与勾选与统计。可在工具栏取消");
                 default:      return L10n.T("相册缓存中从未见过（可能删过，也可能尚未同步）");
             }
         }
@@ -636,7 +647,8 @@ namespace NikkiPhotoCleaner
                 case Deleted: return 0;
                 case Suspect: return 1;
                 case TooNew:  return 2;
-                default:      return 3;
+                case InAlbum: return 3;
+                default:      return 4;   // Ignored 沉到最底，不碍眼
             }
         }
 
@@ -648,6 +660,7 @@ namespace NikkiPhotoCleaner
                 case Deleted: return Theme.ClayDark;
                 case Suspect: return Theme.AmberDeep;
                 case InAlbum: return Theme.GreenDark;
+                case Ignored: return Theme.Text2;
                 default:      return Theme.Text3;
             }
         }
@@ -666,6 +679,19 @@ namespace NikkiPhotoCleaner
         public string Status;
         /// <summary>扫描时的「太新」阈值，用于按当前语言生成判定理由</summary>
         public int MinAgeDays;
+
+        /// <summary>
+        /// 外部导入：文件是被拷进 ScreenShot 的，不是游戏自己截的
+        /// （判据：创建时间明显晚于修改时间）。这是「标签」，可以叠加在任何状态上，
+        /// 不覆盖 Status —— 用户需要同时知道「它本来会被判成什么」和「为什么被排除」。
+        /// </summary>
+        public bool External;
+
+        /// <summary>用户是否对这张照片做过手工标记（忽略）。存在用户标记表里的才算。</summary>
+        public bool Ignored;
+
+        /// <summary>不参与勾选、统计与移动：已忽略或外部导入。</summary>
+        public bool Excluded { get { return Ignored || External; } }
     }
 
     internal class LedgerEntry
@@ -673,6 +699,13 @@ namespace NikkiPhotoCleaner
         public string FirstSeen;
         public string LastSeen;
         public bool EverInAlbum;
+
+        /// <summary>
+        /// 记录时的文件大小。同名但大小对不上，说明这张和当初记的不是同一份文件
+        /// （例如原图被一个同名新截图顶替），必须当作新文件重新建档，
+        /// 否则新照片会继承 EverInAlbum 被误判成「游戏里已删」。
+        /// </summary>
+        public long Size;
     }
 
     // ============================================================
@@ -696,11 +729,16 @@ namespace NikkiPhotoCleaner
                     if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
                     var f = line.Split('\t');
                     if (f.Length < 4) continue;
+                    long size = 0;
+                    // 第 5 列（大小）是 1.7.0 才加的：旧台账只有 4 列，读出来 Size=0，
+                    // 表示「不知道」，此时不做同名覆盖校验，行为与旧版一致
+                    if (f.Length >= 5) long.TryParse(f[4], out size);
                     l.Map[f[0]] = new LedgerEntry
                     {
                         FirstSeen = f[1],
                         LastSeen = f[2],
-                        EverInAlbum = f[3] == "1"
+                        EverInAlbum = f[3] == "1",
+                        Size = size
                     };
                 }
             }
@@ -711,19 +749,142 @@ namespace NikkiPhotoCleaner
         public void Save()
         {
             var sb = new StringBuilder();
-            sb.AppendLine("# 文件名\t首次进入相册\t最后见到\t是否在册");
+            sb.AppendLine("# 文件名\t首次进入相册\t最后见到\t是否在册\t大小");
             foreach (var k in Map.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             {
                 var v = Map[k];
                 sb.AppendLine(string.Join("\t", new[]
                 {
-                    k, v.FirstSeen, v.LastSeen, v.EverInAlbum ? "1" : "0"
+                    k, v.FirstSeen, v.LastSeen, v.EverInAlbum ? "1" : "0", v.Size.ToString()
                 }));
             }
             // 目录可能还没建（例如被外部清理掉），这里自保一次
             var dir = Path.GetDirectoryName(AppPaths.LedgerPath);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             File.WriteAllText(AppPaths.LedgerPath, sb.ToString(), new UTF8Encoding(false));
+        }
+    }
+
+    // ============================================================
+    //  用户标记（忽略 / 将来可扩展「确认是游戏截图」）
+    // ============================================================
+
+    internal class UserMarkEntry
+    {
+        public string Name;
+        public long Size;
+        public bool Ignore;
+        public string Time;
+
+        /// <summary>标记文字。目前只有一种，留成方法便于以后加「确认是游戏截图」。</summary>
+        public string KindText { get { return L10n.T("已忽略"); } }
+    }
+
+    /// <summary>
+    /// 用户对单张照片的手工意志。和台账分开存：
+    /// 台账是「程序观察到的事实」（自动维护，可以整份删掉重建），
+    /// 这里是「用户说的话」（只能由用户自己改，程序绝不擅自丢）。
+    ///
+    /// key 用「文件名 + 大小」两个字段，不认单纯的文件名：
+    /// 同名但大小变了，说明硬盘上已经是另一张照片，旧标记不该套到它头上。
+    /// 这个方向是安全的 —— 宁可漏掉一条忽略，也不要误忽略一张本该清理的照片。
+    /// </summary>
+    internal class MarkStore
+    {
+        public readonly Dictionary<string, UserMarkEntry> Map =
+            new Dictionary<string, UserMarkEntry>(StringComparer.OrdinalIgnoreCase);
+
+        public static MarkStore Load()
+        {
+            var m = new MarkStore();
+            if (!File.Exists(AppPaths.MarkPath)) return m;
+            try
+            {
+                foreach (var line in File.ReadAllLines(AppPaths.MarkPath, Encoding.UTF8))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+                    var f = line.Split('\t');
+                    if (f.Length < 3) continue;
+                    long size = 0;
+                    long.TryParse(f[1], out size);
+                    m.Map[f[0]] = new UserMarkEntry
+                    {
+                        Name = f[0],
+                        Size = size,
+                        Ignore = f[2].IndexOf('i') >= 0,
+                        Time = f.Length >= 4 ? f[3] : ""
+                    };
+                }
+            }
+            catch { }
+            return m;
+        }
+
+        /// <summary>命中的标记项；大小对不上则视为不是同一张照片，返回 null。</summary>
+        public UserMarkEntry Hit(string name, long size)
+        {
+            UserMarkEntry e;
+            if (!Map.TryGetValue(name, out e)) return null;
+            if (e.Size != 0 && size != 0 && e.Size != size) return null;
+            return e;
+        }
+
+        public bool IsIgnored(string name, long size)
+        {
+            var e = Hit(name, size);
+            return e != null && e.Ignore;
+        }
+
+        public void SetIgnore(string name, long size, bool on)
+        {
+            if (on)
+            {
+                Map[name] = new UserMarkEntry
+                {
+                    Name = name,
+                    Size = size,
+                    Ignore = true,
+                    Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+            }
+            else
+            {
+                Map.Remove(name);
+            }
+        }
+
+        public int Count { get { return Map.Count; } }
+
+        public void Save()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# 文件名\t大小\t标记(i=已忽略)\t标记时间");
+            foreach (var k in Map.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+            {
+                var v = Map[k];
+                sb.AppendLine(string.Join("\t", new[]
+                {
+                    k, v.Size.ToString(), v.Ignore ? "i" : "", v.Time ?? ""
+                }));
+            }
+            var text = sb.ToString();
+
+            var path = AppPaths.MarkPath;
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+            // 改之前先把上一版留一份：用户手滑批量标记错了，还能从 .bak 捡回来
+            try
+            {
+                if (File.Exists(path))
+                {
+                    var old = File.ReadAllText(path);
+                    if (old != text) File.Copy(path, path + ".bak", true);
+                }
+            }
+            catch { }
+
+            File.WriteAllText(path, text, new UTF8Encoding(false));
         }
     }
 
@@ -822,6 +983,8 @@ namespace NikkiPhotoCleaner
         public List<PhotoItem> Items = new List<PhotoItem>();
         public int AlbumCount;
         public int AlbumDirs;
+        /// <summary>本次扫描读到的用户标记。界面直接复用，免得再读一遍文件。</summary>
+        public MarkStore Marks;
         /// <summary>硬性阻断：命中后禁止移动</summary>
         public List<string> Blockers = new List<string>();
         /// <summary>温和提示：只展示，不阻断操作</summary>
@@ -859,6 +1022,9 @@ namespace NikkiPhotoCleaner
 
             // 2) 本地照片
             var ledger = Ledger.Load();
+            var marks = MarkStore.Load();
+            res.Marks = marks;
+
             var extOk = new[] { ".jpg", ".jpeg", ".png" };
             var files = new DirectoryInfo(screenShotDir).GetFiles()
                 .Where(f => extOk.Contains(f.Extension.ToLowerInvariant()))
@@ -866,8 +1032,17 @@ namespace NikkiPhotoCleaner
 
             foreach (var f in files)
             {
+                // 同名但大小对不上 = 硬盘上已经是另一张照片（原图被同名新截图顶替）。
+                // 必须把旧档案作废，否则新照片会白捡一条 EverInAlbum 被误判成「游戏里已删」。
+                LedgerEntry prev;
+                if (ledger.Map.TryGetValue(f.Name, out prev) && prev.Size != 0 && prev.Size != f.Length)
+                {
+                    ledger.Map.Remove(f.Name);
+                    prev = null;
+                }
+
                 var inAlbum = albumNames.Contains(f.Name);
-                var ever = ledger.Map.ContainsKey(f.Name) && ledger.Map[f.Name].EverInAlbum;
+                var ever = prev != null && prev.EverInAlbum;
 
                 string status;
                 if (inAlbum) status = StatusText.InAlbum;
@@ -876,6 +1051,15 @@ namespace NikkiPhotoCleaner
 
                 var age = (now - f.LastWriteTime).TotalDays;
                 if (status != StatusText.InAlbum && age < minAgeDays) status = StatusText.TooNew;
+
+                // 外部导入：游戏截图是「写完即定稿」，创建时间和修改时间几乎一致；
+                // 从 U 盘/网盘/另一台机器拷进来的文件，修改时间保留原值、创建时间变成拷贝那一刻。
+                // 这个判据是单边的（拷入只会让创建时间 > 修改时间），用图片软件改过图则相反，不会误中。
+                var external = (f.CreationTime - f.LastWriteTime).TotalHours > 1.0;
+
+                // 用户手工标记优先级最高，直接盖掉上面的判定
+                var ignored = marks.IsIgnored(f.Name, f.Length);
+                if (ignored) status = StatusText.Ignored;
 
                 // 更新台账
                 if (inAlbum)
@@ -888,10 +1072,12 @@ namespace NikkiPhotoCleaner
                     }
                     e.EverInAlbum = true;
                     e.LastSeen = now.ToString("yyyy-MM-dd HH:mm:ss");
+                    e.Size = f.Length;
                 }
                 else if (ledger.Map.ContainsKey(f.Name))
                 {
                     ledger.Map[f.Name].LastSeen = now.ToString("yyyy-MM-dd HH:mm:ss");
+                    ledger.Map[f.Name].Size = f.Length;
                 }
 
                 res.Items.Add(new PhotoItem
@@ -902,7 +1088,9 @@ namespace NikkiPhotoCleaner
                     Time = f.LastWriteTime,
                     AgeDays = Math.Round(age, 1),
                     Status = status,
-                    MinAgeDays = minAgeDays
+                    MinAgeDays = minAgeDays,
+                    External = external,
+                    Ignored = ignored
                 });
             }
             ledger.Save();
@@ -917,8 +1105,11 @@ namespace NikkiPhotoCleaner
                 res.Blockers.Add(L10n.T("游戏内相册缓存为空。可能是你清空过缓存，此时比对结果不可信。"));
             if (res.Items.Count >= 5)
             {
-                var bad = res.Items.Count(p => p.Status == StatusText.Deleted || p.Status == StatusText.Suspect);
-                if ((double)bad / res.Items.Count > 0.7)
+                // 用户已经表过态的照片（忽略）和明显不是游戏截图的（外部导入）不该参与比例判断，
+                // 否则把 U 盘备份拷进来一次就会撞红线，真正该看的警告反而成了噪音
+                var pool = res.Items.Where(p => !p.Excluded).ToList();
+                var bad = pool.Count(p => p.Status == StatusText.Deleted || p.Status == StatusText.Suspect);
+                if (pool.Count >= 5 && (double)bad / pool.Count > 0.7)
                     res.Blockers.Add(L10n.T("超过 70% 的本地照片被判定为待删，比例异常，建议先人工抽查。"));
             }
 
@@ -1167,10 +1358,19 @@ namespace NikkiPhotoCleaner
         private Panel _listTools;
         private Label _lblSel;
         private SoftButton _btnSelAll;
+        private SoftButton _btnMark, _btnUnmark, _btnByStatus;
         private StatCard _statKeep, _statDel, _statSus, _statNew;
         private PictureBox _preview;
         private Label _lblInfo;
         private Label _lblStat;
+
+        /// <summary>扫描后发现「已删除」但一张都没勾时出现的顶部黄条</summary>
+        private CardPanel _noticeBar;
+        private Label _lblNotice;
+        private SoftButton _btnNoticeAll;
+        private SoftButton _btnNoticeClose;
+        /// <summary>用户点了黄条上的 ×，本次扫描内不再出现</summary>
+        private bool _noticeDismissed;
         private SoftButton _btnReport;
         private SoftButton _btnMove;
         private SoftButton _btnOpenPending;
@@ -1325,6 +1525,15 @@ namespace NikkiPhotoCleaner
             statsRow.Controls.Add(_statNew);
             statsRow.Resize += (s, e) => LayoutStats(statsRow);
 
+            // 点卡片＝批量勾选这一类。用户本来就盯着这四张卡看，
+            // 到这里找「把那 12 张都选上」比回头去工具栏下拉里翻要顺手得多。
+            // 「仍在相册」故意不做成可点：那批照片游戏里还有，不该有任何一键全选的入口。
+            var tipKeep = new ToolTip();
+            tipKeep.SetToolTip(_statKeep, L10n.T("游戏相册里还有这些照片，正常情况下不需要清理"));
+            BindStatClick(_statDel,  StatusText.Deleted, L10n.T("游戏里已删"));
+            BindStatClick(_statSus,  StatusText.Suspect, L10n.T("无法确认"));
+            BindStatClick(_statNew,  StatusText.TooNew,  L10n.T("太新"));
+
             // ================= 工具条 =================
             var toolbar = new Panel { Dock = DockStyle.Top, Height = 42, BackColor = Theme.Bg };
 
@@ -1349,7 +1558,52 @@ namespace NikkiPhotoCleaner
             };
 
             var tip = new ToolTip();
-            tip.SetToolTip(_chkOnlyPending, L10n.T("只列出「已删除 / 疑似 / 太新」三类，隐藏仍在相册里的照片"));
+            tip.SetToolTip(_chkOnlyPending, L10n.T("只列出需要你判断的：已删除 / 疑似 / 太新。仍在相册与已忽略的会隐藏"));
+
+            // ================= 顶部黄条 =================
+            // 1.7.0 起一张都不预勾选。安全感换来了「得自己去找」，
+            // 这条黄条就是补偿：扫完直接告诉你「有 N 张」，想省事点右边一下，想稳妥就自己挑。
+            _noticeBar = new CardPanel
+            {
+                Dock = DockStyle.Top,
+                Height = S(46),
+                Inset = 6,
+                Radius = 12,
+                Fill = Theme.YellowSoft,
+                Border = Theme.YellowLine,
+                PadX = 0,
+                PadY = 0,
+                Visible = false
+            };
+
+            _lblNotice = new Label
+            {
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = Theme.F(8.6f),
+                ForeColor = Theme.YellowDeep,
+                BackColor = Color.Transparent,
+                Text = ""
+            };
+
+            _btnNoticeAll = new SoftButton(L10n.T("全部勾选"), BtnKind.Ghost, S(78));
+            _btnNoticeAll.Font = Theme.F(8.4f);
+            _btnNoticeAll.Height = S(26);
+            _btnNoticeAll.PadX = 11;
+            _btnNoticeAll.FitWidth();
+            _btnNoticeAll.Click += (s, e) => SelectAllDeleted();
+
+            _btnNoticeClose = new SoftButton("✕", BtnKind.Ghost, S(24));
+            _btnNoticeClose.Font = Theme.F(7.8f);
+            _btnNoticeClose.Height = S(24);
+            _btnNoticeClose.PadX = 5;
+            _btnNoticeClose.FitWidth();
+            _btnNoticeClose.Click += (s, e) => { _noticeDismissed = true; UpdateNotice(); };
+
+            _noticeBar.Controls.Add(_lblNotice);
+            _noticeBar.Controls.Add(_btnNoticeAll);
+            _noticeBar.Controls.Add(_btnNoticeClose);
+            _noticeBar.Resize += (s, e) => LayoutNotice();
 
             // ================= 中间：列表 + 预览 =================
             _split = new SplitContainer
@@ -1376,8 +1630,8 @@ namespace NikkiPhotoCleaner
             // 表头必须和列一一对应：第 0 列是勾选圈，标题留空
             _listHeader = new ListHeader(new[]
             {
-                "", L10n.T("状态"), L10n.T("文件名"), L10n.T("拍摄时间"), L10n.T("大小")
-            })
+                "", L10n.T("状态"), L10n.T("标记"), L10n.T("文件名"), L10n.T("拍摄时间"), L10n.T("大小")
+            }, 4)
             { Dock = DockStyle.Top, Target = null };
 
             _list = new BufferedListView
@@ -1400,6 +1654,7 @@ namespace NikkiPhotoCleaner
             // 空的第一列只放自绘复选框；给一个 1px 高的 ImageList 只为把行高撑开
             _list.Columns.Add("", 40);
             _list.Columns.Add(L10n.T("状态"), 88);
+            _list.Columns.Add(L10n.T("标记"), 76);
             _list.Columns.Add(L10n.T("文件名"), 300);
             _list.Columns.Add(L10n.T("拍摄时间"), 152);
             _list.Columns.Add(L10n.T("大小"), 70);
@@ -1431,8 +1686,24 @@ namespace NikkiPhotoCleaner
             _btnSelAll.FitWidth();
             _btnSelAll.Click += (s, e) => ToggleSelectAll();
 
+            // 手工标记：给「程序猜不准」的照片一个出口。
+            // 典型场景是 U 盘里的历史备份被拷回 ScreenShot —— 名字和台账里一样，
+            // 会被判成「游戏里已删」，但它们在游戏里根本不存在，不该被清理。
+            _btnMark = ListToolButton(L10n.T("标记忽略"), S(74));
+            _btnMark.Click += (s, e) => SetIgnoreOnChecked(true);
+
+            _btnUnmark = ListToolButton(L10n.T("取消忽略"), S(74));
+            _btnUnmark.Click += (s, e) => SetIgnoreOnChecked(false);
+
+            // 按状态批量勾选：八个动作塞进一个下拉，工具栏才放得下
+            _btnByStatus = ListToolButton(L10n.T("按状态") + " ▾", S(78));
+            _btnByStatus.Click += (s, e) => ShowByStatusMenu();
+
             _listTools.Controls.Add(_lblSel);
             _listTools.Controls.Add(_btnSelAll);
+            _listTools.Controls.Add(_btnByStatus);
+            _listTools.Controls.Add(_btnUnmark);
+            _listTools.Controls.Add(_btnMark);
             _listTools.Resize += (s, e) => LayoutListTools();
 
             _list.SelectedIndexChanged += (s, e) => ShowPreview();
@@ -1558,6 +1829,7 @@ namespace NikkiPhotoCleaner
             root.Controls.Add(_bar);
             root.Controls.Add(bottom);
             root.Controls.Add(toolbar);
+            root.Controls.Add(_noticeBar);
             root.Controls.Add(statsRow);
             root.Controls.Add(pathCard);
             root.Controls.Add(header);
@@ -1628,9 +1900,37 @@ namespace NikkiPhotoCleaner
             }
         }
 
+        /// <summary>统计卡点击 = 勾选 / 取消勾选某一类的全部行（被排除的跳过）。</summary>
+        private void BindStatClick(StatCard card, string status, string label)
+        {
+            card.Hoverable = true;
+            card.Cursor = Cursors.Hand;
+
+            var tip = new ToolTip();
+            tip.SetToolTip(card, L10n.F("点一下勾选全部「{0}」，再点一下取消", label));
+
+            card.Click += (s, e) =>
+            {
+                if (_view == null || _view.Count == 0) return;
+                var pool = _view.Where(p => p.Status == status && !p.Excluded).ToList();
+                if (pool.Count == 0) return;
+
+                var all = pool.Count(p => _checked.Contains(p.Name)) >= pool.Count;
+                foreach (var p in pool)
+                {
+                    if (all) _checked.Remove(p.Name);
+                    else _checked.Add(p.Name);
+                }
+
+                _list.Invalidate();
+                RefreshSelUi();
+                UpdateMoveButtonText();
+            };
+        }
+
         private void LayoutColumns()
         {
-            if (_list == null || _list.Columns.Count < 5) return;
+            if (_list == null || _list.Columns.Count < 6) return;
             var scale = DeviceDpi / 96f;
 
             // 时间列按实际文字量算，不同 DPI / 字体下都不会被截成「10-20 23…」
@@ -1641,13 +1941,18 @@ namespace NikkiPhotoCleaner
             var c0 = (int)(34 * scale);
             var c1 = TextRenderer.MeasureText(StatusText.Name(StatusText.Suspect), Theme.F(8.2f)).Width + 30;
             if (c1 < (int)(62 * scale)) c1 = (int)(62 * scale);
-            var c4 = TextRenderer.MeasureText("000.0 MB", Theme.F(8.6f)).Width + 24;
-            if (c4 < (int)(58 * scale)) c4 = (int)(58 * scale);
+
+            // 「外部导入」是标记列里最长的一种，按它实测宽度留位
+            var c2 = TextRenderer.MeasureText(L10n.T("外部导入"), Theme.F(7.8f)).Width + 20;
+            if (c2 < (int)(58 * scale)) c2 = (int)(58 * scale);
+
+            var c5 = TextRenderer.MeasureText("000.0 MB", Theme.F(8.6f)).Width + 24;
+            if (c5 < (int)(58 * scale)) c5 = (int)(58 * scale);
 
             // 一定要预留垂直滚动条宽度：ListView 出现滚动条时不保证触发 Resize，
             // 按「当前」ClientSize 算满会溢出，冒出横向滚动条并把「大小」列裁掉。
             var scroll = SystemInformation.VerticalScrollBarWidth;
-            var fixedW = c0 + c1 + timeW + c4;
+            var fixedW = c0 + c1 + c2 + timeW + c5;
 
             // 逐列设宽度，每设一次 ListView 就重排一遍并重画；包在 BeginUpdate 里只重画一次
             _list.BeginUpdate();
@@ -1655,12 +1960,13 @@ namespace NikkiPhotoCleaner
             {
                 _list.Columns[0].Width = c0;
                 _list.Columns[1].Width = c1;
-                _list.Columns[3].Width = timeW;
-                _list.Columns[4].Width = c4;
+                _list.Columns[2].Width = c2;
+                _list.Columns[4].Width = timeW;
+                _list.Columns[5].Width = c5;
 
                 var nameW = _list.ClientSize.Width - fixedW - scroll - 2;
                 if (nameW < 120) nameW = 120;
-                _list.Columns[2].Width = nameW;
+                _list.Columns[3].Width = nameW;
             }
             finally { _list.EndUpdate(); }
         }
@@ -1696,18 +2002,20 @@ namespace NikkiPhotoCleaner
         {
             var specs = new[]
             {
-                new object[] { "2026_10_20_21_24_47_2143244.jpeg", StatusText.Deleted, 9.0 },
-                new object[] { "2026_10_19_18_03_12_2138771.jpeg", StatusText.Deleted, 10.0 },
-                new object[] { "2026_10_17_11_42_58_2129903.jpeg", StatusText.Deleted, 12.0 },
-                new object[] { "2026_10_16_09_15_33_2124418.jpeg", StatusText.Deleted, 13.0 },
-                new object[] { "2026_10_12_20_31_07_2116730.jpeg", StatusText.Suspect, 17.0 },
-                new object[] { "2026_10_11_22_08_44_2115092.jpeg", StatusText.Suspect, 18.0 },
-                new object[] { "2026_10_29_08_12_05_2160140.jpeg", StatusText.TooNew, 0.4 },
-                new object[] { "2026_10_28_19_55_31_2158802.jpeg", StatusText.TooNew, 1.1 },
-                new object[] { "2026_10_24_15_20_09_2151277.jpeg", StatusText.InAlbum, 5.0 },
-                new object[] { "2026_10_23_12_47_26_2149864.jpeg", StatusText.InAlbum, 6.0 },
-                new object[] { "2026_10_22_17_33_51_2148205.jpeg", StatusText.InAlbum, 7.0 },
-                new object[] { "2026_10_21_10_06_14_2146922.jpeg", StatusText.InAlbum, 8.0 }
+                new object[] { "2026_10_20_21_24_47_2143244.jpeg", StatusText.Deleted, 9.0,  false },
+                new object[] { "2026_10_19_18_03_12_2138771.jpeg", StatusText.Deleted, 10.0, false },
+                new object[] { "2026_10_17_11_42_58_2129903.jpeg", StatusText.Deleted, 12.0, false },
+                new object[] { "2026_10_16_09_15_33_2124418.jpeg", StatusText.Deleted, 13.0, true  },
+                new object[] { "2026_10_12_20_31_07_2116730.jpeg", StatusText.Suspect, 17.0, false },
+                new object[] { "2026_10_11_22_08_44_2115092.jpeg", StatusText.Suspect, 18.0, false },
+                new object[] { "2026_10_29_08_12_05_2160140.jpeg", StatusText.TooNew, 0.4,  false },
+                new object[] { "2026_10_28_19_55_31_2158802.jpeg", StatusText.TooNew, 1.1,  false },
+                new object[] { "2026_10_09_14_22_41_2113208.jpeg", StatusText.Ignored, 20.0, false },
+                new object[] { "2026_10_08_09_50_17_2111944.jpeg", StatusText.Ignored, 21.0, true  },
+                new object[] { "2026_10_24_15_20_09_2151277.jpeg", StatusText.InAlbum, 5.0,  false },
+                new object[] { "2026_10_23_12_47_26_2149864.jpeg", StatusText.InAlbum, 6.0,  false },
+                new object[] { "2026_10_22_17_33_51_2148205.jpeg", StatusText.InAlbum, 7.0,  false },
+                new object[] { "2026_10_21_10_06_14_2146922.jpeg", StatusText.InAlbum, 8.0,  false }
             };
 
             var dir = Path.Combine(Path.GetTempPath(), "nikki-demo");
@@ -1730,16 +2038,20 @@ namespace NikkiPhotoCleaner
                     Size = 1_240_000 + items.Count * 33_000L,
                     Time = DateTime.Now.AddDays(-(double)s[2]),
                     AgeDays = (double)s[2],
-                    Status = (string)s[1]
+                    Status = (string)s[1],
+                    External = (bool)s[3],
+                    Ignored = (string)s[1] == StatusText.Ignored,
+                    MinAgeDays = 3
                 });
             }
 
             _screenShot = dir;
             _txtPath.Text = dir;
-            _result = new ScanResult { Items = items, AlbumCount = 44, AlbumDirs = 3 };
+            _result = new ScanResult { Items = items, AlbumCount = 44, AlbumDirs = 3, Marks = new MarkStore() };
 
+            // 与真机一致：一张都不预勾选，黄条负责提示
             _checked.Clear();
-            foreach (var p in items.Where(x => x.Status == StatusText.Deleted)) _checked.Add(p.Name);
+            _noticeDismissed = false;
 
             RebindList();
             UpdateStat();
@@ -1897,12 +2209,26 @@ namespace NikkiPhotoCleaner
 
             if (e.ColumnIndex == 2)
             {
-                var r = new Rectangle(cell.Left + 4, cell.Top, cell.Width - 8, cell.Height);
-                Theme.Str(g, p.Name, Theme.F(8.9f), e.Item.Selected ? Theme.Text : Theme.Text2, r, Theme.LeftMid);
+                // 标记列只画「外部导入」：已忽略在状态列已经写着了，不必重复
+                if (!p.External) return;
+                var label = L10n.T("外部导入");
+                var f = Theme.F(7.6f);
+                var tw = TextRenderer.MeasureText(label, f).Width;
+                var pill = new Rectangle(cell.Left + 2, mid - 10, Math.Min(tw + 14, cell.Width - 6), 20);
+                Theme.DrawRound(g, pill, 10, Theme.LineSoft, Theme.Line);
+                Theme.Str(g, label, f, Theme.Text2, pill, Theme.CenterMid);
                 return;
             }
 
             if (e.ColumnIndex == 3)
+            {
+                var r = new Rectangle(cell.Left + 4, cell.Top, cell.Width - 8, cell.Height);
+                var fore = p.Ignored ? Theme.Text3 : (e.Item.Selected ? Theme.Text : Theme.Text2);
+                Theme.Str(g, p.Name, Theme.F(8.9f), fore, r, Theme.LeftMid);
+                return;
+            }
+
+            if (e.ColumnIndex == 4)
             {
                 var r = new Rectangle(cell.Left, cell.Top, cell.Width - 8, cell.Height);
                 Theme.Str(g, p.Time.ToString("MM-dd HH:mm"), Theme.F(8.6f), Theme.Text3, r, Theme.RightMid);
@@ -2002,10 +2328,12 @@ namespace NikkiPhotoCleaner
             {
                 _result = Scanner.Run(_screenShot, MinAgeDays);
 
-                // 每次扫描后，把判定为「已删除」的照片自动勾选，用户可自行取消
+                // 1.7.0 起不再自动勾选任何照片。以前「已删除」默认全勾，
+                // 用户从 U 盘把备份拷回来时，这批文件名字和台账里一致、同样判成「已删除」，
+                // 一扫描就整批预勾上，手滑点一次「移入待清理」就把备份搬走了。
+                // 现在一律不勾，改由顶部黄条提示「发现 N 张，点这里一键勾选」。
                 _checked.Clear();
-                foreach (var p in _result.Items.Where(p => p.Status == StatusText.Deleted))
-                    _checked.Add(p.Name);
+                _noticeDismissed = false;   // 新一轮扫描，黄条重新有机会出现
 
                 RebindList();
                 UpdateStat();
@@ -2042,8 +2370,10 @@ namespace NikkiPhotoCleaner
         {
             if (_result == null) return;
 
+            // 「待处理」= 需要你判断的：仍在相册的和已经表过态的（忽略）都不算
             _view = _chkOnlyPending.Checked
-                ? _result.Items.Where(p => p.Status != StatusText.InAlbum).ToList()
+                ? _result.Items.Where(p => p.Status != StatusText.InAlbum &&
+                                           p.Status != StatusText.Ignored).ToList()
                 : _result.Items.ToList();
 
             _list.BeginUpdate();
@@ -2053,12 +2383,18 @@ namespace NikkiPhotoCleaner
                 // 第一列留给自绘的勾选圈，文字从第二列开始；显示内容全部由 PhotoItem 现画
                 var it = new ListViewItem("");
                 it.SubItems.Add(StatusText.Name(p.Status));
+                it.SubItems.Add(p.External ? L10n.T("外部导入") : "");
                 it.SubItems.Add(p.Name);
                 it.SubItems.Add(p.Time.ToString("yyyy-MM-dd HH:mm"));
                 it.SubItems.Add(FmtSize(p.Size));
                 it.Tag = p;
-                // 中文界面下文件名列放不下 30+ 字符，悬停给出完整名字
-                it.ToolTipText = p.Name;
+                // 中文界面下文件名列放不下 30+ 字符，悬停给出完整名字；
+                // 被标记过的再补一句原因，用户不必点开预览也知道它为什么被排除
+                it.ToolTipText = p.Ignored
+                    ? p.Name + "\n" + L10n.T("已标记忽略，不参与勾选与统计")
+                    : p.External
+                        ? p.Name + "\n" + L10n.T("看起来是外部拷入的照片，默认不勾选")
+                        : p.Name;
                 _list.Items.Add(it);
             }
             _list.EndUpdate();
@@ -2085,10 +2421,157 @@ namespace NikkiPhotoCleaner
         {
             if (_listTools == null || _btnSelAll == null || _lblSel == null) return;
 
-            var b = _btnSelAll;
-            var x = _listTools.Width - b.Width - S(2);
-            b.SetBounds(x, (_listTools.Height - b.Height) / 2, b.Width, b.Height);
-            _lblSel.SetBounds(S(4), 0, Math.Max(S(40), x - S(10)), _listTools.Height);
+            // 从右往左摆：全选 → 按状态 → 取消忽略 → 标记忽略，剩下的给报数文字
+            var order = new[] { _btnSelAll, _btnByStatus, _btnUnmark, _btnMark };
+            var gap = S(6);
+            var x = _listTools.Width - S(2);
+            foreach (var b in order)
+            {
+                if (b == null) continue;
+                x -= b.Width;
+                b.SetBounds(x, (_listTools.Height - b.Height) / 2, b.Width, b.Height);
+                x -= gap;
+            }
+            _lblSel.SetBounds(S(4), 0, Math.Max(S(40), x - S(4)), _listTools.Height);
+        }
+
+        /// <summary>勾选工具条上的小按钮，样式统一收在这里。</summary>
+        private SoftButton ListToolButton(string text, int width)
+        {
+            var b = new SoftButton(text, BtnKind.Ghost, width);
+            b.Font = Theme.F(8.4f);
+            b.Height = S(26);
+            b.PadX = 11;
+            b.FitWidth();
+            return b;
+        }
+
+        /// <summary>标记 / 取消标记 只在「勾选的照片里确实有这一类的」时可点。</summary>
+        private void UpdateMarkButtons()
+        {
+            if (_btnMark == null || _btnUnmark == null) return;
+
+            var picked = _view == null ? 0 : _view.Count(p => _checked.Contains(p.Name));
+            var markable = _view == null ? 0 : _view.Count(p => _checked.Contains(p.Name) && !p.Ignored);
+            var unmarkable = _view == null ? 0 : _view.Count(p => _checked.Contains(p.Name) && p.Ignored);
+
+            _btnMark.Enabled = picked > 0 && markable > 0;
+            _btnUnmark.Enabled = picked > 0 && unmarkable > 0;
+            _btnByStatus.Enabled = _view != null && _view.Count > 0;
+        }
+
+        /// <summary>把当前勾选的照片标为已忽略 / 取消忽略，然后重新扫描式地刷新状态。</summary>
+        private void SetIgnoreOnChecked(bool on)
+        {
+            if (_result == null || _result.Marks == null) return;
+            if (DemoMode) return;   // 演示模式只画界面，不往真实的用户标记文件里写东西
+
+            var targets = _view.Where(p => _checked.Contains(p.Name) && (on ? !p.Ignored : p.Ignored)).ToList();
+            if (targets.Count == 0) return;
+
+            // 防手滑：一次标一大片，基本是「按状态全选」之后顺手点的。
+            // 取消标记是往安全方向走，不拦；只有「标为忽略」需要确认一次。
+            if (on)
+            {
+                var total = Math.Max(1, _result.Items.Count);
+                if (targets.Count >= 20 || targets.Count * 3 > total)
+                {
+                    var r = MessageBox.Show(this,
+                        L10n.F("要把这 {0} 张（共 {1} 张）都标记为「已忽略」吗？\n\n" +
+                               "标记后它们不会被勾选、不会被移动，也不再计入待删统计。\n" +
+                               "之后随时可以用「取消忽略」还原。",
+                               targets.Count, total),
+                        L10n.T("确认批量标记"),
+                        MessageBoxButtons.OKCancel, MessageBoxIcon.Question,
+                        MessageBoxDefaultButton.Button2);   // 默认落在「取消」上
+                    if (r != DialogResult.OK) return;
+                }
+            }
+
+            foreach (var p in targets)
+            {
+                _result.Marks.SetIgnore(p.Name, p.Size, on);
+                p.Ignored = on;
+                p.Status = on ? StatusText.Ignored : Rejudge(p);
+            }
+            _result.Marks.Save();
+
+            // 标记只是改了状态，不重新读盘；排序会变，所以整表重绑一次
+            _result.Items = _result.Items
+                .OrderBy(p => StatusText.Order(p.Status))
+                .ThenByDescending(p => p.Time)
+                .ToList();
+
+            RebindList();
+            UpdateStat();
+        }
+
+        /// <summary>取消忽略时该恢复成什么状态 —— 按台账重新推一遍，不依赖任何缓存。</summary>
+        private string Rejudge(PhotoItem p)
+        {
+            var ledger = Ledger.Load();
+            LedgerEntry e;
+            var ever = ledger.Map.TryGetValue(p.Name, out e) && e.EverInAlbum
+                       && (e.Size == 0 || e.Size == p.Size);
+
+            if (ever) return StatusText.Deleted;
+            return p.AgeDays < p.MinAgeDays ? StatusText.TooNew : StatusText.Suspect;
+        }
+
+        /// <summary>「按状态 ▾」：八个批量勾选动作。</summary>
+        private void ShowByStatusMenu()
+        {
+            if (_view == null || _view.Count == 0) return;
+
+            var menu = new ContextMenuStrip { Font = Theme.F(8.8f), ShowImageMargin = false };
+
+            Action<string, bool, string> add = (status, on, caption) =>
+            {
+                var item = new ToolStripMenuItem(caption);
+                item.Click += (s, e) => SelectByStatus(status, on);
+                menu.Items.Add(item);
+            };
+
+            add(StatusText.Deleted, true,  L10n.T("勾选全部「游戏里已删」"));
+            add(StatusText.Deleted, false, L10n.T("取消勾选全部「游戏里已删」"));
+            menu.Items.Add(new ToolStripSeparator());
+            add(StatusText.TooNew, true,   L10n.T("勾选全部「太新」"));
+            add(StatusText.TooNew, false,  L10n.T("取消勾选全部「太新」"));
+            menu.Items.Add(new ToolStripSeparator());
+            add(StatusText.Suspect, true,  L10n.T("勾选全部「无法确认」"));
+            add(StatusText.Suspect, false, L10n.T("取消勾选全部「无法确认」"));
+            menu.Items.Add(new ToolStripSeparator());
+            add(StatusText.Ignored, true,  L10n.T("勾选全部「已忽略」"));
+            add(StatusText.Ignored, false, L10n.T("取消勾选全部「已忽略」"));
+
+            var below = _btnByStatus.PointToScreen(new Point(0, _btnByStatus.Height + 2));
+            menu.Show(below);
+        }
+
+        /// <summary>
+        /// 按状态批量勾选。作用范围是「当前筛选出来的行」，
+        /// 被「只看待处理项」藏起来的那批不会被顺手勾上。
+        /// </summary>
+        private void SelectByStatus(string status, bool on)
+        {
+            if (_view == null) return;
+
+            var hit = _view.Where(p => p.Status == status && (on || _checked.Contains(p.Name)));
+            foreach (var p in hit)
+            {
+                if (on)
+                {
+                    // 被标记排除的不批量勾上，否则「按状态全选 + 移动」等于绕过标记；
+                    // 唯独「已忽略」这一类要能选中 —— 选上它才好点「取消忽略」。
+                    if (p.Excluded && status != StatusText.Ignored) continue;
+                    _checked.Add(p.Name);
+                }
+                else _checked.Remove(p.Name);
+            }
+
+            _list.Invalidate();
+            RefreshSelUi();
+            UpdateMoveButtonText();
         }
 
         /// <summary>刷新「已勾选 12 / 128 张」与全选按钮的措辞。</summary>
@@ -2096,8 +2579,11 @@ namespace NikkiPhotoCleaner
         {
             if (_btnSelAll == null || _lblSel == null) return;
 
-            var total = _view == null ? 0 : _view.Count;
-            var n = total == 0 ? 0 : _view.Count(p => _checked.Contains(p.Name));
+            // 分母只算「能移动的」：已忽略和外部导入本来就勾不上，
+            // 把它们算进总数会让「全选」按钮永远显示成「全选」，永远变不成「取消全选」
+            var pool = _view == null ? new List<PhotoItem>() : _view.Where(p => !p.Excluded).ToList();
+            var total = pool.Count;
+            var n = total == 0 ? 0 : pool.Count(p => _checked.Contains(p.Name));
 
             // 当前视野里全勾上了，按钮就变成「取消全选」
             _btnSelAll.Text = (total > 0 && n >= total) ? L10n.T("取消全选") : L10n.T("全选");
@@ -2109,6 +2595,60 @@ namespace NikkiPhotoCleaner
                 : L10n.F("已勾选 {0} / {1} 张", n, total);
 
             LayoutListTools();
+            UpdateNotice();
+            UpdateMarkButtons();
+        }
+
+        /// <summary>黄条内部布局：文字吃左边，右边依次是「全部勾选」和关闭。</summary>
+        private void LayoutNotice()
+        {
+            if (_noticeBar == null || _lblNotice == null) return;
+            var pad = _noticeBar.Inset + 10;
+            var right = _noticeBar.Width - _noticeBar.Inset - 8;
+            if (right < pad + 40) return;
+
+            var c = _btnNoticeClose;
+            c.SetBounds(right - c.Width, (_noticeBar.Height - c.Height) / 2, c.Width, c.Height);
+            right -= c.Width + 2;
+
+            var a = _btnNoticeAll;
+            a.SetBounds(right - a.Width, (_noticeBar.Height - a.Height) / 2, a.Width, a.Height);
+            right -= a.Width + 8;
+
+            _lblNotice.SetBounds(pad, _noticeBar.Inset,
+                Math.Max(40, right - pad), _noticeBar.Height - _noticeBar.Inset * 2);
+        }
+
+        /// <summary>按当前勾选情况决定黄条要不要出现。</summary>
+        private void UpdateNotice()
+        {
+            if (_noticeBar == null) return;
+
+            var del = _result == null ? 0 : _result.Items.Count(p => p.Status == StatusText.Deleted);
+            var picked = _result == null ? 0
+                : _result.Items.Count(p => p.Status == StatusText.Deleted && _checked.Contains(p.Name));
+
+            // 一张都没勾才算「还没开始」；勾过任何一张就不再打扰。
+            // 没有「已删除」的照片、或用户点了 ×，都不显示。
+            var show = del > 0 && picked == 0 && !_noticeDismissed;
+
+            if (show)
+                _lblNotice.Text = L10n.F("发现 {0} 张「游戏里已删」，一张都还没勾。要清理就点右边。", del);
+
+            if (_noticeBar.Visible != show) _noticeBar.Visible = show;
+            if (show) LayoutNotice();
+        }
+
+        /// <summary>黄条上的「全部勾选」：只勾「已删除」，被排除的一律跳过。</summary>
+        private void SelectAllDeleted()
+        {
+            if (_result == null) return;
+            foreach (var p in _result.Items.Where(p => p.Status == StatusText.Deleted && !p.Excluded))
+                _checked.Add(p.Name);
+
+            _list.Invalidate();
+            RefreshSelUi();
+            UpdateMoveButtonText();
         }
 
         /// <summary>
@@ -2118,12 +2658,25 @@ namespace NikkiPhotoCleaner
         /// <summary>给截图/自检入口用：等价于点一下「全选」按钮。</summary>
         internal void SelectAllForTest() { ToggleSelectAll(); }
 
+        /// <summary>给截图入口用：滚到列表最后一行，方便确认「已忽略」这种沉底的状态。</summary>
+        internal void ScrollListToEndForTest()
+        {
+            if (_list == null || _list.Items.Count == 0) return;
+            _list.EnsureVisible(_list.Items.Count - 1);
+            Application.DoEvents();
+        }
+
         private void ToggleSelectAll()
         {
             if (_view == null || _view.Count == 0) return;
 
-            var all = _view.Count(p => _checked.Contains(p.Name)) >= _view.Count;
-            foreach (var p in _view)
+            // 只作用在「允许被移动」的行上：已忽略和外部导入的不参与，
+            // 否则「全选 + 移动」就成了绕过标记的后门。
+            var pool = _view.Where(p => !p.Excluded).ToList();
+            if (pool.Count == 0) return;
+
+            var all = pool.Count(p => _checked.Contains(p.Name)) >= pool.Count;
+            foreach (var p in pool)
             {
                 if (all) _checked.Remove(p.Name);
                 else _checked.Add(p.Name);
@@ -2141,10 +2694,13 @@ namespace NikkiPhotoCleaner
             int del  = _result.Items.Count(p => p.Status == StatusText.Deleted);
             int sus  = _result.Items.Count(p => p.Status == StatusText.Suspect);
             int nw   = _result.Items.Count(p => p.Status == StatusText.TooNew);
+            int cut  = _result.Items.Count(p => p.Excluded);
 
-            _lblStat.Text = L10n.F(
+            var head = L10n.F(
                 "本地 {0} 张｜在册 {1}｜已删除 {2}｜疑似 {3}｜太新 {4}",
                 _result.Items.Count, kept, del, sus, nw);
+            // 被排除的张数单独报一句：不然卡上写「已删除 12」、实际只能勾 9 张，对不上账
+            _lblStat.Text = cut > 0 ? head + L10n.F("｜排除 {0}", cut) : head;
 
             _statKeep.Count = kept.ToString();
             _statDel.Count = del.ToString();
@@ -2161,13 +2717,10 @@ namespace NikkiPhotoCleaner
                 _lblHint.ForeColor = Theme.AmberDeep;
                 _lblHint.Text = "ⓘ " + _result.Hints[0];
             }
-            else if (del > 0)
-            {
-                _lblHint.ForeColor = Theme.GreenDeep;
-                _lblHint.Text = L10n.F("已自动勾选 {0} 张判定为「已删除」的照片，核对后可移入待清理文件夹。", del);
-            }
             else
             {
+                // 不再单独报「有 N 张已删除」——顶部黄条已经说了同一件事，
+                // 底部再说一遍只会跟右侧一排按钮抢地方，把句子挤成两行。
                 _lblHint.ForeColor = Theme.Text3;
                 _lblHint.Text = L10n.T("勾选要清理的照片后点「移入待清理文件夹」；双击可看大图。");
             }
@@ -2209,10 +2762,14 @@ namespace NikkiPhotoCleaner
             catch { _preview.Image = null; }
 
             // 文件名在列表里就在旁边，这里不再重复，只留判定真正用得上的信息
+            var reason = StatusText.Reason(p.Status, p.MinAgeDays);
+            if (p.External)
+                reason += "\r\n" + L10n.T("同时标记为「外部导入」：像是从外部拷进来的，默认不勾选");
+
             _lblInfo.Text = L10n.F(
                 "状态：{0}　{1}\r\n拍摄：{2}\r\n判定：{3}",
                 StatusText.Name(p.Status), FmtSize(p.Size),
-                p.Time.ToString("yyyy-MM-dd HH:mm:ss"), StatusText.Reason(p.Status, p.MinAgeDays));
+                p.Time.ToString("yyyy-MM-dd HH:mm:ss"), reason);
             _lblInfo.ForeColor = StatusText.ForeColor(p.Status);
         }
 
@@ -2291,11 +2848,19 @@ namespace NikkiPhotoCleaner
                 return;
             }
 
-            var target = _result.Items.Where(p => _checked.Contains(p.Name)).ToList();
+            // 被标记忽略 / 判为外部导入的一律不搬 —— 即使用户把它们勾上了。
+            // 勾选圈仍然允许点，是为了让人能勾上去取消标记，不是让人绕过标记搬走。
+            var target = _result.Items
+                .Where(p => _checked.Contains(p.Name) && !p.Excluded)
+                .ToList();
 
             if (target.Count == 0)
             {
-                MessageBox.Show(this, BuildNoTargetMessage(), L10n.T("没有可移动的照片"),
+                var excluded = _result.Items.Count(p => _checked.Contains(p.Name) && p.Excluded);
+                var msg = excluded > 0
+                    ? L10n.F("勾选的 {0} 张都被标记为「已忽略」或「外部导入」，不会移动。\n\n要移动它们，先取消标记。", excluded)
+                    : BuildNoTargetMessage();
+                MessageBox.Show(this, msg, L10n.T("没有可移动的照片"),
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
