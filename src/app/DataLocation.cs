@@ -312,22 +312,40 @@ namespace NikkiPhotoCleaner
                 var full = Path.GetFullPath(screenShotDir.Trim().Trim('"')).TrimEnd('\\', '/');
                 var parts = full.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
 
+                // ① 标准安装：…\InfinityNikki_APP\InfinityNikki\X6Game\ScreenShot
+                //    从下往上找名叫 InfinityNikki 的那一段，取它的父级 ⇒ …\InfinityNikki_APP
+                var anchor = -1;
                 for (var i = parts.Length - 1; i >= 0; i--)
                 {
                     if (!string.Equals(parts[i], "InfinityNikki", StringComparison.OrdinalIgnoreCase)) continue;
+                    anchor = i;
+                    break;
+                }
+                // 找到了这一段却取不出父级（游戏直接装在盘根），就不再往下试了：
+                // 换 ② 算出来的会是游戏目录本身，把数据塞进游戏里正是要避免的事
+                if (anchor >= 0) return ParentOf(parts, anchor);
 
-                    // 这一段已经是盘根后的第一级，没有可用的父级
-                    if (i == 0) return null;
-
-                    var parent = string.Join("\\", parts, 0, i);
-                    // "D:" 这类盘根不往里放东西
-                    if (parent.Length <= 2 || parent.EndsWith(":")) return null;
-
-                    return parent;
+                // ② 自定义安装：…\Games\X6Game\ScreenShot —— 没有 InfinityNikki 这一段。
+                //    退一步以 X6Game 为锚，取「装着游戏的那个目录」。
+                //    标准布局里 ① 会先命中，两条分支不会打架。
+                for (var i = parts.Length - 1; i >= 0; i--)
+                {
+                    if (!string.Equals(parts[i], "X6Game", StringComparison.OrdinalIgnoreCase)) continue;
+                    return ParentOf(parts, i);
                 }
             }
             catch { }
             return null;
+        }
+
+        /// <summary>取 parts 里第 index 段之前的全部，作为父目录；盘根（"D:"）不算可用位置。</summary>
+        private static string ParentOf(string[] parts, int index)
+        {
+            if (parts == null || index <= 0 || index > parts.Length) return null;
+
+            var parent = string.Join("\\", parts, 0, index);
+            if (parent.Length <= 2 || parent.EndsWith(":")) return null;
+            return parent;
         }
 
         /// <summary>

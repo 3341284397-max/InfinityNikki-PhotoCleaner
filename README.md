@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 **[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
 
-**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.1/NikkiPhotoCleaner.exe) (direct link, no login needed).
+**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.2/NikkiPhotoCleaner.exe) (direct link, no login needed).
 
 A third option: [Baidu Wangpan](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) — code `1111`. It holds the full bundle (exe + Chinese readme + screenshots + the dependency-free fallback), which is the one to use when neither code host is reachable.
 
@@ -275,10 +275,18 @@ Designed so that a mis-click still cannot lose a photo:
 
 ## Where files go
 
-**The first launch just runs; the question comes later, once the game folder is known.**
-The app starts with its data next to the exe (the way it worked up to 1.7) and asks you for
-`X6Game\ScreenShot`. Only then can a location "next to the game" be computed — and only then
-does it ask whether to move the data there:
+**The first launch asks one thing first: where are your game photos?**
+
+The app needs that folder to know which screenshots already made it into the in-game album,
+and only then can it work out where "next to the game" would be. Whatever it detects is only
+**pre-filled** — nothing is used until you click "Use this one". Previously detection was
+adopted silently, so you never knew which folder the app had picked and had no chance to correct it.
+
+Click "Skip for now" and the app still opens, with "no game photo folder yet" in the main window;
+"Change folder" in the top-right corner fixes it later. In that case the data-location question
+is **not** asked — without a path there is no recommendation to make.
+
+Once you confirm, the second question appears:
 
 | Choice | Data lives in |
 |---|---|
@@ -289,16 +297,20 @@ does it ask whether to move the data there:
 Choosing "move" goes through the same path as "Change location": copy → verify file count and
 total bytes → delete the old folder.
 
-Why not ask at startup: before you have pointed the app at a screenshot folder, the recommended
-location cannot be computed — the only definite choice would be "next to the exe", which means
-asking a question you cannot answer yet.
+How the recommendation is computed: find the segment named `InfinityNikki` and take its parent.
+Custom installs (`D:\Games\X6Game\ScreenShot`) have no such segment, so the parent of `X6Game`
+is used instead. If the game sits directly at a drive root (`D:\InfinityNikki\…`), neither level
+is a good place — the app then offers no recommendation at all, only "leave it" / "pick a folder".
 
 The answer is stored in `%APPDATA%\NikkiPhotoCleaner\location.txt`.
 It cannot live inside the data folder itself: the location is the thing being recorded, so that would be self-referential.
 
-Upgrading users **never see this dialog** — if a data folder already sits next to the exe, it is adopted silently and remembered.
+Returning users **never see either window** — a remembered game folder and an existing data
+folder next to the exe are both reused silently.
 
-![Asking where the data should go, once the game folder is known](docs/screenshots/data-en.png)
+![Confirming the game photo folder first](docs/screenshots/game-en.png)
+
+![Then asking where the data should go](docs/screenshots/data-en.png)
 
 
 Inside the data folder:

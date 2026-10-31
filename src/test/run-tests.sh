@@ -478,5 +478,56 @@ grep -q "Source=Saved" <<< "$OUTC" \
 rm -rf "$PTR" "$LOCROOT"
 
 echo
+echo "========== 29. 首次启动：先问照片目录，认了再问数据位置 =========="
+FIRST="$(pwd)/_tmp_first"
+FPTR="$(pwd)/_tmp_ptr_first"
+rm -rf "$FIRST" "$FPTR"
+FSS="$FIRST/InfinityNikki_APP/InfinityNikki/X6Game/ScreenShot"
+mkdir -p "$FSS" "$FIRST/InfinityNikki_APP/InfinityNikki/X6Game/Saved/GamePlayPhotos/999/NikkiPhotos_HighQuality"
+FWIN="$(cygpath -w "$FSS")"
+FBASE="$(cygpath -w "$FIRST")"
+
+frun() { NIKKI_POINTER_DIR="$(cygpath -w "$FPTR")" run "$@"; }
+
+FOUT=$(frun firstrun)
+echo "$FOUT" | sed 's/^/  /'
+grep -q "^需要问照片目录=1" <<< "$FOUT" \
+  && echo "  [OK] 没见过配置时，第一步就问「游戏照片在哪」" \
+  || { echo "  [FAIL] 没有先问照片目录（1.1 的问题）"; FAIL=1; }
+
+BADOUT=$(frun savegame 'D:\Games\某处\ScreenShot')
+grep -q "被认可=0" <<< "$BADOUT" \
+  && echo "  [OK] 随手选个不像的目录不会被当成游戏目录" \
+  || { echo "  [FAIL] 错误目录被认可了"; FAIL=1; }
+
+FOUT2=$(frun firstrun)
+grep -q "^需要问照片目录=1" <<< "$FOUT2" \
+  && echo "  [OK] 上一轮没认下来，还会再问" \
+  || { echo "  [FAIL] 错误目录被记成有效配置"; FAIL=1; }
+
+GOODOUT=$(frun savegame "$FWIN")
+echo "$GOODOUT" | sed 's/^/  /'
+grep -q "被认可=1" <<< "$GOODOUT" \
+  && echo "  [OK] 用户确认过的 ScreenShot 目录能存下来" \
+  || { echo "  [FAIL] 合法目录存不进去"; FAIL=1; }
+
+FOUT3=$(frun firstrun)
+grep -q "^需要问照片目录=0" <<< "$FOUT3" \
+  && echo "  [OK] 认过之后不再重复问（老用户零打扰）" \
+  || { echo "  [FAIL] 每次启动都问"; FAIL=1; }
+
+CUSTOM=$(frun sibling 'D:\Games\X6Game\ScreenShot')
+[ "$CUSTOM" = 'D:\Games' ] \
+  && echo "  [OK] 自定义安装也能推出并列位置（D:\Games\X6Game ⇒ D:\Games）" \
+  || { echo "  [FAIL] 自定义安装推不出位置：$CUSTOM"; FAIL=1; }
+
+ROOTINST=$(frun sibling 'D:\InfinityNikki\X6Game\ScreenShot')
+[ "$ROOTINST" = "(null)" ] \
+  && echo "  [OK] 游戏装在盘根时宁可不推荐，也不把数据塞进游戏目录" \
+  || { echo "  [FAIL] 推出了不该用的位置：$ROOTINST"; FAIL=1; }
+
+rm -rf "$FIRST" "$FPTR"
+
+echo
 echo "全部用例执行完毕。测试目录：$ROOT 与 $TAG"
 exit $FAIL

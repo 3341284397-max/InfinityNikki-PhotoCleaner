@@ -358,9 +358,16 @@ namespace NikkiPhotoCleaner
             Form f = null;
             try
             {
-                f = string.Equals(which, "first", StringComparison.OrdinalIgnoreCase)
-                    ? (Form)new FirstRunDialog(@"D:\G2_InfinityNikki\InfinityNikki_APP\InfinityNikki\X6Game\ScreenShot")
-                    : (Form)new DataLocationDialog();
+                // 示例路径用中性的 D:\Games\…，不要写死开发机上的真实目录：
+                // 这张图会进文档，别人会以为程序默认就是这个路径
+                const string sample = @"D:\Games\InfinityNikki\InfinityNikki_APP\InfinityNikki\X6Game\ScreenShot";
+
+                if (string.Equals(which, "game", StringComparison.OrdinalIgnoreCase))
+                    f = new GameFolderDialog(sample);
+                else if (string.Equals(which, "first", StringComparison.OrdinalIgnoreCase))
+                    f = new FirstRunDialog(sample);
+                else
+                    f = new DataLocationDialog();
 
                 f.StartPosition = FormStartPosition.Manual;
                 var wa = Screen.PrimaryScreen.WorkingArea;
@@ -1108,20 +1115,6 @@ namespace NikkiPhotoCleaner
             }
             return null;
         }
-
-        public static string AskUser(IWin32Window owner)
-        {
-            using (var dlg = new FolderBrowserDialog())
-            {
-                dlg.Description = L10n.T("请选择：无限暖暖\\X6Game\\ScreenShot 文件夹");
-                dlg.ShowNewFolderButton = false;
-                if (dlg.ShowDialog(owner) != DialogResult.OK) return null;
-                if (IsScreenShotDir(dlg.SelectedPath)) return dlg.SelectedPath;
-                MessageBox.Show(owner, L10n.T("所选目录看起来不对。\n它的上一级文件夹名必须是 X6Game。"),
-                    L10n.T("目录无效"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return null;
-            }
-        }
     }
 
     // ============================================================
@@ -1730,7 +1723,7 @@ namespace NikkiPhotoCleaner
             AppPaths.EnsureDirs();
             BuildUi();
             Load += (s, e) => InitSplit();
-            Shown += (s, e) => StartScan(true);
+            Shown += (s, e) => FirstRun();
         }
 
         /// <summary>把系统灰蓝标题栏染成界面底色，Win10 上该调用会失败，静默保留原样。</summary>
@@ -1841,7 +1834,7 @@ namespace NikkiPhotoCleaner
             _btnPick = Btn(L10n.T("重新选择"), BtnKind.Ghost, 88);
             _btnRescan = Btn(L10n.T("重新扫描"), BtnKind.Primary, 94);
             _btnPick.Click += (s, e) => PickFolder();
-            _btnRescan.Click += (s, e) => StartScan(false);
+            _btnRescan.Click += (s, e) => StartScan();
 
             pathCard.Controls.Add(_lblPath);
             pathCard.Controls.Add(pathBox);
@@ -2471,7 +2464,7 @@ namespace NikkiPhotoCleaner
 
             // 保留用户手动勾选的内容，不能被重新扫描冲掉
             var keep = new HashSet<string>(_checked, StringComparer.OrdinalIgnoreCase);
-            StartScan(false);
+            StartScan();
             _checked.Clear();
             foreach (var n in keep) _checked.Add(n);
             RebindList();
@@ -2492,7 +2485,7 @@ namespace NikkiPhotoCleaner
             if (string.IsNullOrEmpty(_screenShot)) { SetEmpty(L10n.T("尚未指定游戏目录")); return; }
 
             _checked.Clear();
-            StartScan(false);
+            StartScan();
             RebindList();
             UpdateStat();
         }
@@ -2827,38 +2820,67 @@ namespace NikkiPhotoCleaner
         }
 
         // ==================== 扫描 ====================
-        private void PickFolder()
+        /// <summary>
+        /// 启动流程：先确认「游戏照片在哪」，再问「使用数据放哪」。
+        ///
+        /// 顺序不能反：数据位置那张窗里的推荐位是拿 ScreenShot 路径推出来的，
+        /// 没有路径就没有推荐位（1.9.1 之前正是在没有路径的时候先问了，只能给一张灰卡）。
+        ///
+        /// 老用户（配置里已经有有效目录）完全看不到这两步，直接进扫描。
+        /// </summary>
+        private void FirstRun()
         {
-            var p = GameLocator.AskUser(this);
-            if (p != null)
+            if (Headless) { StartScan(); return; }
+
+            var saved = Config.GameDir;
+            if (saved != null)
             {
-                _screenShot = p;
-                GameLocator.Save(p);
-                StartScan(false);
+                _screenShot = saved;
             }
+            else
+            {
+                // 没配过，或者配过但那台机器上的文件夹已经没了（换了电脑、挪了盘）
+                using (var dlg = new GameFolderDialog())
+                {
+                    if (dlg.ShowDialog(this) == DialogResult.OK && !string.IsNullOrEmpty(dlg.ChosenPath))
+                    {
+                        _screenShot = dlg.ChosenPath;
+                        GameLocator.Save(_screenShot);
+                    }
+                    else
+                    {
+                        // 跳过/关窗口：不扫描，也就不问数据位置 —— 没有路径推不出推荐位，
+                        // 硬问只会给出「和 exe 放一起」这种没有信息量的答案
+                        _txtPath.Text = L10n.T("尚未指定");
+                        SetEmpty(L10n.T("还没指定游戏照片文件夹。点右上角「重新选择」挑一个。"));
+                        return;
+                    }
+                }
+            }
+
+            StartScan();
         }
 
-        private void StartScan(bool autoLocate)
+        private void PickFolder()
+        {
+            using (var dlg = new GameFolderDialog(_screenShot))
+            {
+                if (dlg.ShowDialog(this) != DialogResult.OK || string.IsNullOrEmpty(dlg.ChosenPath)) return;
+
+                _screenShot = dlg.ChosenPath;
+                GameLocator.Save(_screenShot);
+            }
+
+            StartScan();
+        }
+
+        private void StartScan()
         {
             if (Headless)
             {
                 if (DemoMode) LoadDemoData();
                 else SetEmpty(L10n.T("尚未指定游戏目录"));
                 return;
-            }
-
-            if (autoLocate)
-            {
-                _screenShot = GameLocator.Auto();
-                if (_screenShot == null)
-                {
-                    var r = MessageBox.Show(this,
-                        L10n.T("没能自动找到游戏的 ScreenShot 文件夹。\n要手动选择吗？"),
-                        L10n.T("未找到游戏目录"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (r == DialogResult.Yes) _screenShot = GameLocator.AskUser(this);
-                    if (_screenShot == null) { SetEmpty(L10n.T("尚未指定游戏目录")); return; }
-                    GameLocator.Save(_screenShot);
-                }
             }
 
             if (_screenShot == null) { SetEmpty(L10n.T("尚未指定游戏目录")); return; }
@@ -3643,7 +3665,7 @@ namespace NikkiPhotoCleaner
 
             // 搬走之后待清理视图的内容也变了，顺手刷一下，免得切过去还是旧列表
             ReloadPending();
-            StartScan(false);
+            StartScan();
         }
 
         /// <summary>一张都没勾时，把「为什么」讲清楚，而不是一声不响</summary>
@@ -3743,7 +3765,7 @@ namespace NikkiPhotoCleaner
                 L10n.F("已还原 {0} 张。", ok) + (failed > 0 ? "\n" + L10n.F("失败 {0} 张（可能被占用）。", failed) : ""),
                 L10n.T("完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-            StartScan(false);
+            StartScan();
         }
 
         // ==================== 清理自身记录 ====================
@@ -3754,7 +3776,7 @@ namespace NikkiPhotoCleaner
                 if (RecordCleaner.ShowDialog(this, _screenShot))
                 {
                     // 台账或移动记录可能被清掉，重新扫描以刷新统计
-                    if (!string.IsNullOrEmpty(_screenShot)) StartScan(false);
+                    if (!string.IsNullOrEmpty(_screenShot)) StartScan();
                     else UpdateButtons();
                 }
             }

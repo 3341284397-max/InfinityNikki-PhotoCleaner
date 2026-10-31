@@ -36,7 +36,7 @@ namespace NikkiPhotoCleaner
                     return 0;
 
                 case "shotdata":
-                    // shotdata <png> first|where：数据位置相关的两个窗口
+                    // shotdata <png> game|first|where：首次启动的两个窗口 + 数据位置管理窗口
                     DialogShot(args[1], args.Length > 2 ? args[2] : "where");
                     return 0;
 
@@ -124,6 +124,16 @@ namespace NikkiPhotoCleaner
                 case "commit":
                     // commit <新父目录>：模拟用户当场选完位置，验证立刻生效（不用重启）
                     Console.Write(CommitLocation(args[1]));
+                    return 0;
+
+                case "savegame":
+                    // savegame <截图目录>：模拟「用户在第一问里确认了照片目录」
+                    Console.Write(SaveGame(args[1]));
+                    return 0;
+
+                case "firstrun":
+                    // firstrun：首次启动两步问询的判定，验证「先问照片、再问数据」
+                    Console.Write(FirstRun());
                     return 0;
             }
 
@@ -419,6 +429,31 @@ namespace NikkiPhotoCleaner
         /// 但 DataLocation 自己缓存的旧解析没作废 —— 于是选完位置在本次运行里根本没生效，
         /// 数据照旧写回 exe 旁边。这条用例断言「当场生效」，不靠重启。
         /// </summary>
+        private static string SaveGame(string ss)
+        {
+            GameLocator.Save(ss);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("保存的值=" + ss);
+            sb.AppendLine("读回来=" + (Config.GameDir ?? "(null)"));
+            sb.AppendLine("被认可=" + (Config.GameDir == null ? "0" : "1"));
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 首次启动的两步问询：①要不要先问「照片在哪」 ②要不要再问「数据放哪」。
+        /// 顺序断言的关键是第一个为 0 之后第二个才有意义 —— 没有路径就推不出推荐位。
+        /// </summary>
+        private static string FirstRun()
+        {
+            var game = Config.GameDir;
+            var sb = new StringBuilder();
+            sb.AppendLine("需要问照片目录=" + (game == null ? "1" : "0"));
+            sb.AppendLine("已有照片目录=" + (game ?? "(null)"));
+            sb.AppendLine("需要问数据位置=" + (DataLocation.AskNeeded ? "1" : "0"));
+            return sb.ToString();
+        }
+
         private static string CommitLocation(string newBase)
         {
             var before = AppPaths.DataDir;

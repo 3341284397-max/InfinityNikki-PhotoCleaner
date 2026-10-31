@@ -6,9 +6,9 @@
 
 简体中文 | [English](README.md)
 
-**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.1/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
+**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.2/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
 
-**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.1/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
+**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.2/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
 
 **GitHub 打不开或太慢？** 仓库在 Gitee 有一份国内镜像：[gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner)，exe 直链下载无需登录。两个仓库内容一致，issue 提在哪边都会看。
 
@@ -269,9 +269,18 @@ exe 没有代码签名，Windows 可能以两种方式拦截，处理办法不�
 
 ## 数据都放在哪
 
-**第一次启动照常开工，等定位到游戏目录之后才问一次。**
-程序先把数据放在 exe 旁边（1.7 及以前的行为），同时引导你选 `X6Game\ScreenShot`；
-一旦知道游戏在哪，「和游戏文件夹并列」这个位置才算得出来 —— 这时候才弹窗问要不要搬：
+**第一次启动先问你一件事：游戏的照片在哪。**
+
+程序要靠这个目录才知道「哪些截图已经进了游戏相册」，也才算出「把使用数据放到游戏旁边」
+是哪一级。自动探测到的路径只会**预填**在框里 —— 点「就用这个」才算数。
+以前是探到就直接用，用户既不知道程序读了哪个文件夹，也没机会纠正。
+
+不想现在选就点「先跳过」：程序照常打开，主界面提示「还没指定游戏照片文件夹」，
+右上角「重新选择」随时能补。这时候**不会**再问数据位置 —— 没有路径就推不出推荐位。
+
+![先确认游戏照片在哪](docs/screenshots/game-zh.png)
+
+确认之后才问第二个问题：
 
 | 选项 | 数据落在 |
 |---|---|
@@ -281,15 +290,18 @@ exe 没有代码签名，Windows 可能以两种方式拦截，处理办法不�
 
 选「搬过去」会走和「更改位置」同一套流程：复制 → 核对文件数与总字节 → 删掉旧文件夹。
 
-为什么不在启动时就问：那时候用户还没指定截图目录，推荐位置根本算不出来，
-三张卡里只有「和 exe 同目录」是确定的 —— 等于问了一个当时答不上来的问题。
+推荐位怎么算：先找路径里名叫 `InfinityNikki` 的那一段，取它的父目录；
+自定义安装（`D:\Games\X6Game\ScreenShot`）没有这一段，退一步取 `X6Game` 的上一级。
+游戏直接装在盘根（`D:\InfinityNikki\…`）时这两级都不是合适位置，
+那就干脆不给推荐，只留「先不动它 / 我自己选」。
 
 选择结果记在 `%APPDATA%\NikkiPhotoCleaner\location.txt`。
 为什么记在那儿而不是数据目录里：数据目录的位置本身就是被记录的东西，记在里面等于自指。
 
-老用户升级上来**不会看到这个窗口** —— exe 旁边已经有数据目录时直接沿用，并静默记住。
+老用户**不会看到这两个窗口** —— 已经记过游戏目录的、数据文件夹在 exe 旁边已经存在的，
+都直接沿用。
 
-![定位到游戏目录后询问数据位置](docs/screenshots/data-zh.png)
+![确认照片目录之后，再问数据位置](docs/screenshots/data-zh.png)
 
 
 在数据目录之下：

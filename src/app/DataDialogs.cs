@@ -112,6 +112,334 @@ namespace NikkiPhotoCleaner
     }
 
     /// <summary>
+    /// 第一次打开时的第一问：你的游戏照片在哪。
+    ///
+    /// 为什么必须问，而不是探到就用：ScreenShot 目录决定了两件事 —— 读哪些照片，
+    /// 以及「和游戏并列」的那一级落在哪。以前是静默自动探测、探到直接 Save，
+    /// 用户既不知道程序读了哪个文件夹，也没机会纠正（探错了只能事后去「重新选择」）。
+    ///
+    /// 现在探测结果只是预填：找到就填进框里等你点「就用这个」，找不到就让你手选；
+    /// 实在不想现在选也可以跳过，主界面会显示「尚未指定游戏目录」，右上角随时能补。
+    /// </summary>
+    internal class GameFolderDialog : Form
+    {
+        private readonly float _scale;
+        private readonly bool _en;
+        private readonly string _initial;
+
+        private Panel _body;
+        private Panel _box;
+        private Label _lblHint;
+        private Panel _foot;
+        private SoftButton _btnPick, _btnOk, _btnSkip;
+
+        private string _path;
+        private bool _autoFound;
+
+        /// <summary>确认后的 ScreenShot 目录；取消或跳过时为 null。</summary>
+        public string ChosenPath { get; private set; }
+
+        private int S(int v) { return (int)Math.Round(v * _scale); }
+
+        /// <param name="current">已有的目录（「重新选择」用）。给了就不再自动探测，只当初始值。</param>
+        public GameFolderDialog(string current = null)
+        {
+            _scale = DeviceDpi / 96f;
+            _en = L10n.IsEnglish;
+            _initial = current;
+
+            Text = L10n.T("先找到游戏照片");
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            ShowInTaskbar = false;
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Theme.Bg;
+            Font = Theme.F(9f);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            try { Icon = Theme.WindowIcon; } catch { }
+
+            Build();
+
+            // 探测放在窗口出来之后：Auto() 最多要扫 12 秒，先把窗口画出来再等，
+            // 否则用户看到的是「双击了，但什么都没发生」。
+            Shown += (s, e) => Detect();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            Dwm.TintCaption(this);
+        }
+
+        private void Build()
+        {
+            var W = S(_en ? 700 : 620);
+            var pad = S(26);
+            var innerW = W - pad * 2;
+
+            var title = L10n.T("先找到游戏照片");
+            var sub = L10n.T("程序要在这个文件夹里读你的游戏截图、核对哪些已经进了游戏相册。"
+                           + "知道了它在哪，才能算出「使用数据」放到游戏旁边哪一级最合适。"
+                           + "只是读路径，不会动照片。");
+
+            var subH = TextRenderer.MeasureText(sub, Theme.F(8.6f), new Size(innerW, 0),
+                TextFormatFlags.WordBreak).Height;
+            var headH = S(18) + S(30) + S(6) + subH + S(16);
+            var bodyH = S(48) + S(14) + S(32) + S(6);
+            var footH = S(78);
+
+            ClientSize = new Size(W, headH + bodyH + footH);
+
+            // ---- 标题区 ----
+            var head = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = headH,
+                BackColor = Theme.Bg,
+                Padding = new Padding(pad, S(18), pad, 0)
+            };
+            head.Controls.Add(new Label
+            {
+                Dock = DockStyle.Fill,
+                Text = sub,
+                Padding = new Padding(0, S(4), 0, 0),
+                Font = Theme.F(8.6f),
+                ForeColor = Theme.Text3,
+                BackColor = Color.Transparent
+            });
+            head.Controls.Add(new Label
+            {
+                Dock = DockStyle.Top,
+                Height = S(30),
+                Text = title,
+                Font = Theme.F(13.5f, FontStyle.Bold),
+                ForeColor = Theme.Text,
+                BackColor = Color.Transparent
+            });
+
+            // ---- 路径框 + 换一个文件夹 ----
+            _body = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Bg };
+
+            _box = new Panel { BackColor = Theme.Bg };
+            _box.Paint += PaintBox;
+            _body.Controls.Add(_box);
+
+            _lblHint = new Label
+            {
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = Theme.F(8.4f),
+                ForeColor = Theme.Text3,
+                BackColor = Color.Transparent,
+                Text = L10n.T("正在查找游戏目录…")
+            };
+            _body.Controls.Add(_lblHint);
+
+            _btnPick = new SoftButton(L10n.T("换一个文件夹…"), BtnKind.Ghost, S(104));
+            _btnPick.PadX = 16;
+            _btnPick.FitWidth();
+            _btnPick.Click += (s, e) => Pick();
+            _body.Controls.Add(_btnPick);
+
+            _body.Resize += (s, e) => LayoutBody();
+            _body.HandleCreated += (s, e) => LayoutBody();
+
+            // ---- 底栏 ----
+            _foot = new Panel { Dock = DockStyle.Bottom, Height = footH, BackColor = Theme.Bg, Padding = new Padding(pad, 0, pad, 0) };
+            _foot.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(Theme.Line, 1f))
+                    e.Graphics.DrawLine(pen, pad, 0, _foot.Width - pad, 0);
+            };
+
+            var footHint = new Label
+            {
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = Theme.F(8.4f),
+                ForeColor = Theme.Text3,
+                BackColor = Color.Transparent,
+                Text = L10n.T("只读目录，不会动你的照片。")
+            };
+
+            _btnSkip = new SoftButton(L10n.T("先跳过"), BtnKind.Ghost, S(96));
+            _btnSkip.PadX = 16;
+            _btnSkip.FitWidth();
+            _btnSkip.Click += (s, e) =>
+            {
+                ChosenPath = null;
+                DialogResult = DialogResult.Cancel;
+                Close();
+            };
+
+            _btnOk = new SoftButton(L10n.T("就用这个"), BtnKind.Primary, S(104));
+            _btnOk.PadX = 16;
+            _btnOk.FitWidth();
+            _btnOk.Click += (s, e) => Accept();
+
+            _foot.Controls.Add(footHint);
+            _foot.Controls.Add(_btnOk);
+            _foot.Controls.Add(_btnSkip);
+            _foot.Resize += (s, e) => LayoutFoot(footHint);
+
+            Controls.Add(_body);
+            Controls.Add(head);
+            Controls.Add(_foot);
+
+            KeyPreview = true;
+            KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Escape) { ChosenPath = null; DialogResult = DialogResult.Cancel; Close(); }
+                else if (e.KeyCode == Keys.Enter) Accept();
+            };
+
+            LayoutFoot(footHint);
+            LayoutBody();
+        }
+
+        private void LayoutBody()
+        {
+            if (_body == null || _box == null) return;
+
+            var pad = S(26);
+            var w = Math.Max(S(200), _body.ClientSize.Width - pad * 2);
+            var boxH = S(48);
+
+            _box.SetBounds(pad, S(2), w, boxH);
+
+            var rowY = S(2) + boxH + S(14);
+            var rowH = S(32);
+            var btnW = _btnPick.Width;
+
+            _btnPick.SetBounds(pad + w - btnW, rowY, btnW, rowH);
+            _lblHint.SetBounds(pad, rowY, Math.Max(S(80), w - btnW - S(12)), rowH);
+        }
+
+        private void LayoutFoot(Label hint)
+        {
+            if (_foot == null || _btnOk == null) return;
+
+            var gap = S(8);
+            var btnH = S(34);
+            var y = (Math.Max(btnH, _foot.Height) - btnH) / 2;
+            var right = _foot.Width - S(26);
+
+            _btnOk.SetBounds(right - _btnOk.Width, y, _btnOk.Width, btnH);
+            right -= _btnOk.Width + gap;
+            _btnSkip.SetBounds(right - _btnSkip.Width, y, _btnSkip.Width, btnH);
+            right -= _btnSkip.Width + gap;
+
+            if (hint != null) hint.SetBounds(S(26), 0, Math.Max(S(60), right - S(26)), _foot.Height);
+        }
+
+        private void PaintBox(object sender, PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            var empty = string.IsNullOrEmpty(_path);
+            var r = new Rectangle(1, 1, _box.Width - 3, _box.Height - 3);
+
+            Theme.DrawRound(g, r, Theme.R,
+                empty ? Theme.BgWarm : Theme.Card,
+                empty ? Theme.LineSoft : (_autoFound ? Theme.GreenLine : Theme.Line));
+
+            var tr = new Rectangle(r.Left + S(14), r.Top, r.Width - S(28), r.Height);
+            TextRenderer.DrawText(g,
+                empty ? L10n.T("（还没选到文件夹）") : _path,
+                Theme.F(9.2f), tr,
+                empty ? Theme.Text3 : Theme.Text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.PathEllipsis | TextFormatFlags.NoPrefix);
+        }
+
+        /// <summary>窗口出来后探测一次；「重新选择」带进来的已有目录则跳过探测。</summary>
+        private void Detect()
+        {
+            if (!string.IsNullOrEmpty(_initial))
+            {
+                SetPath(_initial, false);
+                _lblHint.Text = L10n.T("现在用的是这个目录，不对就点「换一个文件夹…」。");
+                return;
+            }
+
+            _lblHint.Text = L10n.T("正在查找游戏目录…");
+            _lblHint.Update();
+
+            Cursor = Cursors.WaitCursor;
+            string found;
+            try { found = GameLocator.Auto(); }
+            catch { found = null; }
+            finally { Cursor = Cursors.Default; }
+
+            if (!string.IsNullOrEmpty(found))
+            {
+                SetPath(found, true);
+                _lblHint.Text = L10n.T("这是自动找到的，如果不对点「换一个文件夹…」。");
+            }
+            else
+            {
+                _lblHint.Text = L10n.T("没自动找到，点「换一个文件夹…」自己选一下。");
+                _box.Invalidate();
+            }
+        }
+
+        private void SetPath(string path, bool autoFound)
+        {
+            _path = path;
+            _autoFound = autoFound;
+            _box.Invalidate();
+        }
+
+        private bool Pick()
+        {
+            using (var fbd = new FolderBrowserDialog())
+            {
+                fbd.Description = L10n.T("选游戏的 ScreenShot 文件夹（上一级叫 X6Game，里面是 .jpeg 截图）");
+                fbd.ShowNewFolderButton = false;
+                try
+                {
+                    var seed = string.IsNullOrEmpty(_path) ? null : Path.GetDirectoryName(_path.TrimEnd('\\'));
+                    if (!string.IsNullOrEmpty(seed) && Directory.Exists(seed)) fbd.SelectedPath = seed;
+                }
+                catch { }
+
+                if (fbd.ShowDialog(this) != DialogResult.OK) return false;
+
+                var p = fbd.SelectedPath;
+                if (!GameLocator.IsScreenShotDir(p))
+                {
+                    MessageBox.Show(this,
+                        L10n.T("这个目录看起来不是游戏的 ScreenShot 文件夹。\n\n"
+                             + "正确的那一级长这样：\n…\\X6Game\\ScreenShot\n\n"
+                             + "判断依据：它的上一级文件夹名叫 X6Game，并且同级的 Saved\\GamePlayPhotos 也存在。"),
+                        L10n.T("目录无效"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+
+                SetPath(p, false);
+                _lblHint.Text = L10n.T("好，就用这个目录。");
+                return true;
+            }
+        }
+
+        private void Accept()
+        {
+            if (string.IsNullOrEmpty(_path))
+            {
+                if (!Pick()) return;
+                if (string.IsNullOrEmpty(_path)) return;
+            }
+
+            ChosenPath = _path;
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+    }
+
+    /// <summary>
     /// 定位到游戏目录之后问一次：使用数据要不要挪去和游戏放在一起。
     ///
     /// 为什么挪到这里问：建界面之前用户还没指定 ScreenShot 目录，推荐位置根本算不出来，
