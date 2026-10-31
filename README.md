@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 **[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
 
-**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
+**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.8.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
 
 A third option: [Baidu Wangpan](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) — code `1111`. It holds the full bundle (exe + Chinese readme + screenshots + the dependency-free fallback), which is the one to use when neither code host is reachable.
 
@@ -244,7 +244,24 @@ Designed so that a mis-click still cannot lose a photo:
 
 ## Where files go
 
-Created next to the executable:
+**On first launch the app asks once**, because the default (next to the exe) is unfriendly
+to anyone who keeps the exe on the desktop — it would leave a permanent folder there. Three choices:
+
+| Choice | Data lives in |
+|---|---|
+| Next to the game folder (recommended) | The **parent** of the segment named `InfinityNikki` in your screenshot path (`<…>\InfinityNikki\X6Game\ScreenShot`) — usually `InfinityNikki_APP`, side by side with the `InfinityNikki` folder |
+| Same folder as the exe | The exe's own folder (the default up to 1.7) |
+| Pick a folder myself | Anywhere |
+
+The answer is stored in `%APPDATA%\NikkiPhotoCleaner\location.txt`.
+It cannot live inside the data folder itself: the location is the thing being recorded, so that would be self-referential.
+
+Upgrading users **never see this dialog** — if a data folder already sits next to the exe, it is adopted silently and remembered.
+
+![Choosing where the data goes on first launch](docs/screenshots/data-en.png)
+
+
+Inside the data folder:
 
 | Item | Chinese UI | English UI |
 |---|---|---|
@@ -259,6 +276,24 @@ Created next to the executable:
 **The folder names are resolved once at startup**, by checking which one already exists.
 Switching UI language therefore never creates a second set of folders, and the ledger and move record stay intact.
 If both exist (an upgraded install), the Chinese one wins.
+
+### Move, delete, uninstall
+
+Three things live behind **Data location** in the top-right corner:
+
+- **Move** — copies the current data to a new location, effective after a restart.
+  Existing files are never overwritten, and a location that already holds a data folder is refused,
+  because merging two ledgers would scramble the "deleted in game" verdicts
+- **Delete app data** — removes only the app's own folder (ledger, tags, settings, cache).
+  Photos are untouched; if the review folder still holds some, you are told
+- **Uninstall** — deletes the data and the `location.txt` record, then exits
+
+![Data location](docs/screenshots/data-manage-en.png)
+
+There is no installer, so there is **no uninstaller**: deleting the exe is the uninstall,
+but the data folder stays behind. Three places to clean: the data folder, the review folder,
+and `%APPDATA%\NikkiPhotoCleaner\location.txt`.
+Forgot where your data went? Run the exe once and open **Data location** — it shows the full path.
 
 ---
 
@@ -282,9 +317,9 @@ dotnet build -c Release
 ## Repository layout
 
 ```
-src/app/        C# WinForms sources (Program.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs)
+src/app/        C# WinForms sources (Program.cs / DataLocation.cs / DataDialogs.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs)
 src/scripts/    Zero-dependency PowerShell version (lang/PhotoSync.en.ps1 holds the English strings)
-src/test/       Regression host (net8); run-tests.sh covers 17 cases
+src/test/       Regression host (net8); run-tests.sh covers 22 cases
 web/            Static web version (index.html / styles.css / app.js)
 package/        Four double-click .bat launchers, in Chinese and English
 src/pack/       Builds the share package for cloud drives (exe + 使用说明.txt + screenshots)
@@ -299,7 +334,9 @@ cd src/test && ./run-tests.sh
 
 Covers the status state machine, the "too new" threshold, ledger I/O, move and restore, record cleanup,
 that switching language never splits the data folder (cases 12 and 13), imported-photo detection and tag
-persistence (14–16), and that a same-name/different-size file invalidates its ledger entry (17).
+persistence (14–16), that a same-name/different-size file invalidates its ledger entry (17),
+the stored data-location record and its fallback when stale (18–20), the game-sibling path derivation (21),
+and an end-to-end run proving the data does not land back next to the exe (22).
 
 ## Known limitations
 

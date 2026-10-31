@@ -6,9 +6,9 @@
 
 简体中文 | [English](README.md)
 
-**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
+**[→ 在线体验](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.8.0/NikkiPhotoCleaner.exe)**　·　网页版不装任何东西，选文件夹就能用。
 
-**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.7.0/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
+**三处都能下，内容完全一致**：[→ 下载 exe](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.8.0/NikkiPhotoCleaner.exe)（Gitee，国内直连）· [GitHub](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)（海外）· [百度网盘](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) 提取码 `1111`（整包，含使用说明与截图，Gitee / GitHub 都连不上时用）
 
 **GitHub 打不开或太慢？** 仓库在 Gitee 有一份国内镜像：[gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner)，exe 直链下载无需登录。两个仓库内容一致，issue 提在哪边都会看。
 
@@ -239,7 +239,24 @@ exe 没有代码签名，Windows 可能以两种方式拦截，处理办法不�
 
 ## 数据都放在哪
 
-数据目录建在**程序所在目录**下：
+**第一次启动会问你一次**，因为默认位置（exe 旁边）对「把 exe 拖到桌面双击」的人很不友好 ——
+桌面会多出一个常驻文件夹。三个选项：
+
+| 选项 | 数据落在 |
+|---|---|
+| 跟随游戏放在一起（推荐） | 截图目录 `<…>\InfinityNikki\X6Game\ScreenShot` 中，取名 `InfinityNikki` 的那一级的**父目录**（通常是 `InfinityNikki_APP`），和 `InfinityNikki` 文件夹并列 |
+| 和 exe 放在同一个文件夹 | exe 所在目录（1.7 及以前的默认行为） |
+| 我自己选一个位置 | 任意目录 |
+
+选择结果记在 `%APPDATA%\NikkiPhotoCleaner\location.txt`。
+为什么记在那儿而不是数据目录里：数据目录的位置本身就是被记录的东西，记在里面等于自指。
+
+老用户升级上来**不会看到这个窗口** —— exe 旁边已经有数据目录时直接沿用，并静默记住。
+
+![第一次启动时选择数据位置](docs/screenshots/data-zh.png)
+
+
+在数据目录之下：
 
 | 内容 | 中文界面 | 英文界面 |
 |---|---|---|
@@ -254,6 +271,22 @@ exe 没有代码签名，Windows 可能以两种方式拦截，处理办法不�
 **目录名在程序启动时锁定一次**：只看「已经存在哪一个」。
 所以中途切换界面语言**不会**新建另一套目录，台账和还原记录不会断链。
 如果两个目录都存在（旧版本升级上来的情况），中文目录优先。
+
+### 改位置、删数据、卸载
+
+右上角「数据位置」里三件事：
+
+- **更改位置**：把现有数据复制到新位置，然后重启生效。不覆盖已有文件；
+  目标位置已经有数据目录时直接拒绝 —— 两份台账混在一起会把「已删除」判断搞乱
+- **删除使用数据**：只删工具自己的目录（台账、标记、设置、缓存）。
+  照片不动，待清理文件夹里还有照片时会单独提醒
+- **彻底卸载**：删数据 + 删 `location.txt`，程序随即退出。
+
+![数据位置](docs/screenshots/data-manage-zh.png)
+
+这个程序没有安装过程，所以**没有卸载程序** —— 删掉 exe 就等于卸载，但数据目录会留下。
+三处需要清理：数据目录、待清理文件夹、`%APPDATA%\NikkiPhotoCleaner\location.txt`。
+忘了数据在哪，重下一份 exe 跑一次、点「数据位置」就能看到完整路径。
 
 ---
 
@@ -277,9 +310,9 @@ dotnet build -c Release
 ## 目录结构
 
 ```
-src/app/        C# WinForms 源码（Program.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs）
+src/app/        C# WinForms 源码（Program.cs / DataLocation.cs / DataDialogs.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs）
 src/scripts/    PowerShell 零依赖版（含 lang/PhotoSync.en.ps1 英文语言表）
-src/test/       回归测试宿主（net8），run-tests.sh 共 17 个用例
+src/test/       回归测试宿主（net8），run-tests.sh 共 22 个用例
 web/            网页版（index.html / styles.css / app.js），纯静态
 package/        四个双击即用的 .bat 启动器（中英各四个）
 src/pack/       打「网盘分享包」：exe + 使用说明.txt + 截图 + 零依赖版
@@ -294,7 +327,9 @@ cd src/test && ./run-tests.sh
 
 覆盖：五种判定的时序、太新阈值、台账读写、移动与还原、记录清理、
 中英文切换时数据目录不分裂（用例 12、13）、外部导入识别与忽略标记的持久化（14–16）、
-同名不同大小的台账作废（17）。
+同名不同大小的台账作废（17）、
+数据位置的记录文件生效与失效回落（18–20）、游戏同级目录推导（21）、
+带位置记录跑一次真实界面确认数据没落回 exe 旁边（22）。
 
 ## 已知限制
 

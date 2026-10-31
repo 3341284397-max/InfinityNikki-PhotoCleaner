@@ -34,6 +34,11 @@ namespace NikkiPhotoCleaner
                     DialogUI(args[1], args.Length > 2 ? args[2] : ".");
                     return 0;
 
+                case "shotdata":
+                    // shotdata <png> first|where：数据位置相关的两个窗口
+                    DialogShot(args[1], args.Length > 2 ? args[2] : "where");
+                    return 0;
+
                 case "lang":
                     // lang <ss> <zh|en>：验证切换语言后路径与判定是否连续
                     Console.Write(Lang(args[1], args[2]));
@@ -84,6 +89,16 @@ namespace NikkiPhotoCleaner
                     // （修改时间留在过去、创建时间是现在），模拟从 U 盘拷回来的备份
                     Console.Write(MakeExternal(args[1], args[2]));
                     return 0;
+
+                case "where":
+                    // where：打印数据根目录是怎么定下来的，验证「指针文件」与回落逻辑
+                    Console.Write(Where());
+                    return 0;
+
+                case "sibling":
+                    // sibling <截图目录>：验证「与游戏文件夹并列」那一级推导是否正确
+                    Console.Write(DataLocation.SiblingOf(args.Length > 1 ? args[1] : null) ?? "(null)");
+                    return 0;
             }
 
             Console.WriteLine("未知命令: " + args[0]);
@@ -117,6 +132,22 @@ namespace NikkiPhotoCleaner
             var th = new System.Threading.Thread(() =>
             {
                 try { Program.RunDialogShot(path, screenShot); }
+                catch (Exception ex) { err = ex; }
+            });
+            th.SetApartmentState(System.Threading.ApartmentState.STA);
+            th.Start();
+            th.Join();
+
+            if (err != null) Console.WriteLine("截图失败：" + err);
+            Console.WriteLine(File.Exists(path) ? "截图已写出 " + path : "截图未生成");
+        }
+
+        private static void DialogShot(string path, string which)
+        {
+            Exception err = null;
+            var th = new System.Threading.Thread(() =>
+            {
+                try { Program.RunDataDialogShot(path, which); }
                 catch (Exception ex) { err = ex; }
             });
             th.SetApartmentState(System.Threading.ApartmentState.STA);
@@ -252,6 +283,25 @@ namespace NikkiPhotoCleaner
             File.SetCreationTime(full, DateTime.Now);   // 创建时间=现在，修改时间=10 天前
             return "已改为外部导入特征: " + name +
                    "  差值=" + (File.GetCreationTime(full) - File.GetLastWriteTime(full)).TotalHours.ToString("0.0") + " 小时\n";
+        }
+
+        /// <summary>
+        /// 打印数据位置是怎么定下来的：指针文件在哪、内容是什么、最终用了哪个目录。
+        /// 断言靠这几行，不需要去猜 %APPDATA% 里的内容。
+        /// </summary>
+        private static string Where()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Pointer=" + DataLocation.PointerPath);
+            sb.AppendLine("PointerExists=" + (File.Exists(DataLocation.PointerPath) ? "1" : "0"));
+            sb.AppendLine("PointerValue=" + (DataLocation.SavedBase ?? "(null)"));
+            sb.AppendLine("Source=" + DataLocation.Origin);
+            sb.AppendLine("AskNeeded=" + (DataLocation.AskNeeded ? "1" : "0"));
+            sb.AppendLine("ExeDir=" + DataLocation.ExeDir);
+            sb.AppendLine("ToolRoot=" + AppPaths.ToolRoot);
+            sb.AppendLine("DataDir=" + AppPaths.DataDir);
+            sb.AppendLine("Ledger=" + AppPaths.LedgerPath);
+            return sb.ToString();
         }
     }
 }

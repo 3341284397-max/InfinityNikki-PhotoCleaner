@@ -231,5 +231,96 @@ grep -q "疑似.*$D" <<< "$OUT3" \
 unset NIKKI_TOOL_ROOT
 
 echo
+echo "========== 18-20. 数据位置（指针文件 / 失效回落 / 同级目录推导）=========="
+# 这三条用例故意不设 NIKKI_TOOL_ROOT —— 环境变量优先级最高，留着它就看不出指针文件的作用了。
+# NIKKI_POINTER_DIR 把「位置记录」也关进隔离目录，别动真实用户 %APPDATA% 里的那条。
+PT="$(pwd)/_tmp_ptr"
+P2DIR="$(pwd)/_tmp_ptr_saved"
+rm -rf "$PT" "$P2DIR"
+mkdir -p "$PT" "$P2DIR/无限暖暖清理助手_使用数据"
+
+# 前面几轮截图/演示跑过之后，exe 同级可能已经躺着数据文件夹了 —— 那会让程序
+# 判成「老用户升级」直接沿用，测不到「全新环境」。这里先清掉。
+EXEDIR="$(dirname "$DLL")"
+rm -rf "$EXEDIR/无限暖暖清理助手_使用数据" "$EXEDIR/NikkiCleaner_Data"
+
+# 记录文件里必须是 Windows 路径（D:\...），MSYS 的 /d/... 程序认不出来
+P2WIN="$(cygpath -w "$P2DIR")"
+P2MISS="$(cygpath -w "$PT/已经删掉的目录")"
+
+echo "--- 18. 没有任何位置记录：回落到 exe 目录，并标记「需要询问」---"
+W1=$(env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$PT" NIKKI_LANG=zh \
+     dotnet --roll-forward Major "$DLL" where)
+echo "$W1" | sed 's/^/  /'
+grep -q "PointerExists=0" <<< "$W1" \
+  && echo "  [OK] 首次启动没有位置记录" \
+  || { echo "  [FAIL] 隔离目录里不该有位置记录"; FAIL=1; }
+grep -q "AskNeeded=1" <<< "$W1" \
+  && echo "  [OK] 会弹窗问用户（这是本次改动的目的）" \
+  || { echo "  [FAIL] 没标记需要询问，用户不会看到选择窗口"; FAIL=1; }
+grep -q "Source=ExeDefault" <<< "$W1" \
+  && echo "  [OK] 兜底用的是 exe 目录（与旧版本行为一致）" \
+  || { echo "  [FAIL] 兜底来源不对"; FAIL=1; }
+
+echo "--- 19. 写入位置记录后：下次启动直接用它，不再询问 ---"
+printf '# test\n%s\n' "$P2WIN" > "$PT/location.txt"
+W2=$(env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$PT" NIKKI_LANG=zh \
+     dotnet --roll-forward Major "$DLL" where)
+echo "$W2" | sed 's/^/  /'
+grep -q "Source=Saved" <<< "$W2" \
+  && echo "  [OK] 位置来自记录文件" \
+  || { echo "  [FAIL] 没读到位置记录"; FAIL=1; }
+grep -q "AskNeeded=0" <<< "$W2" \
+  && echo "  [OK] 不再弹窗（不会每次启动都烦人）" \
+  || { echo "  [FAIL] 选过了还在问"; FAIL=1; }
+grep -qF "DataDir=$P2WIN" <<< "$W2" \
+  && echo "  [OK] 数据目录跟着记录走" \
+  || { echo "  [FAIL] 数据目录没跟着记录走"; FAIL=1; }
+
+echo "--- 20. 记录指向的目录没了：当作没选过，回落到 exe 目录 ---"
+printf '%s\n' "$P2MISS" > "$PT/location.txt"
+W3=$(env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$PT" NIKKI_LANG=zh \
+     dotnet --roll-forward Major "$DLL" where)
+grep -q "Source=ExeDefault" <<< "$W3" \
+  && echo "  [OK] 失效记录不会把程序卡在一个不存在的路径上" \
+  || { echo "  [FAIL] 失效记录没被忽略"; FAIL=1; }
+grep -q "AskNeeded=1" <<< "$W3" \
+  && echo "  [OK] 顺便重新问一次，用户可以选个好位置" \
+  || { echo "  [FAIL] 目录丢了却没重新询问"; FAIL=1; }
+
+echo "--- 21. 与游戏文件夹并列的那一级 ---"
+GOT=$(env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$PT" NIKKI_LANG=zh \
+      dotnet --roll-forward Major "$DLL" sibling "D:/G2_InfinityNikki/InfinityNikki_APP/InfinityNikki/X6Game/ScreenShot")
+WANT="D:\\G2_InfinityNikki\\InfinityNikki_APP"
+echo "  截图目录 → 数据父目录: $GOT"
+[ "$GOT" = "$WANT" ] \
+  && echo "  [OK] 推导到 InfinityNikki_APP（与 InfinityNikki 文件夹并列）" \
+  || { echo "  [FAIL] 推导结果应为 $WANT"; FAIL=1; }
+
+rm -rf "$PT" "$P2DIR"
+
+echo "--- 22. 端到端：带着位置记录跑一次界面，数据必须建在记录目录 ---"
+EQ="$(pwd)/_tmp_e2e"
+rm -rf "$EQ"
+mkdir -p "$EQ/chosen" "$EQ/ptr"
+printf '%s\n' "$(cygpath -w "$EQ/chosen")" > "$EQ/ptr/location.txt"
+rm -rf "$EXEDIR/无限暖暖清理助手_使用数据" "$EXEDIR/NikkiCleaner_Data"
+
+env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$(cygpath -w "$EQ/ptr")" NIKKI_LANG=zh \
+    dotnet --roll-forward Major "$DLL" shot "$(cygpath -w "$EQ/out.png")" demo > /dev/null 2>&1
+
+[ -d "$EQ/chosen/无限暖暖清理助手_使用数据" ] \
+  && echo "  [OK] 数据文件夹建在记录目录下" \
+  || { echo "  [FAIL] 记录目录下没建出数据文件夹"; FAIL=1; }
+[ -d "$EXEDIR/无限暖暖清理助手_使用数据" ] \
+  && { echo "  [FAIL] exe 旁边又建了一份（用户就是想避免这个）"; FAIL=1; } \
+  || echo "  [OK] exe 旁边没有再建（桌面不会被弄乱）"
+[ -f "$EQ/chosen/无限暖暖清理助手_使用数据/设置.txt" ] \
+  && echo "  [OK] 设置文件也写在新位置" \
+  || echo "  [--] 这次还没写设置文件（未切换语言，正常）"
+
+rm -rf "$EQ"
+
+echo
 echo "全部用例执行完毕。测试目录：$ROOT 与 $TAG"
 exit $FAIL

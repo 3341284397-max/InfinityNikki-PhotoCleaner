@@ -25,8 +25,9 @@ namespace NikkiPhotoCleaner
             // 供开发核对「记录统计 / 清理」逻辑，不影响正常双击使用
             var argv = Environment.GetCommandLineArgs();
 
-            // 界面语言：--lang zh|en > 设置文件 Language= > 系统语言
-            L10n.Init(ArgValue(argv, "--lang"));
+            // 界面语言：先按命令行 / 系统语言定一版。设置文件要等数据位置确定后才读得到，
+            // 所以这里用不读配置的那个入口，等选完位置再正式 Init 一次。
+            L10n.InitNoConfig(ArgValue(argv, "--lang"));
 
             if (argv.Length >= 3 && argv[1] == "--selftest")
             {
@@ -71,11 +72,52 @@ namespace NikkiPhotoCleaner
                 RunMoveDialogShot(argv[2], n);
                 return;
             }
+            if (argv.Length >= 4 && argv[1] == "--shotdata")
+            {
+                RunDataDialogShot(argv[2], argv[3]);
+                return;
+            }
 
             try { SetProcessDPIAware(); } catch { }
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            // 首次启动先问数据放哪，再让主界面开工。
+            // 顺序很重要：读设置文件会触发 AppPaths 解析，位置一旦按 exe 目录定下来就改不了了。
+            AskWhereToKeepData();
+            L10n.Init(ArgValue(argv, "--lang"));
+
             Application.Run(new MainForm());
+        }
+
+        /// <summary>
+        /// 只有「全新环境」才问：没选过位置，exe 旁边也没有现成的数据文件夹。
+        /// 老用户升级上来沿用原位置，不会看到这个窗口。
+        /// </summary>
+        private static void AskWhereToKeepData()
+        {
+            if (!DataLocation.AskNeeded) { AppPaths.Rebind(); return; }
+
+            try
+            {
+                using (var dlg = new FirstRunDialog())
+                {
+                    var r = dlg.ShowDialog();
+                    var chosen = dlg.ChosenBase;
+                    // 用户直接关窗口＝不想现在决定，按默认位置（exe 旁边）记下来，别每次都问
+                    if (r != DialogResult.OK || string.IsNullOrEmpty(chosen)) chosen = DataLocation.ExeDir;
+
+                    DataLocation.TryRemember(chosen);
+                }
+            }
+            catch
+            {
+                // 弹窗出问题不能挡住启动：退回 exe 同目录继续跑
+            }
+            finally
+            {
+                AppPaths.Rebind();
+            }
         }
 
         private static string ArgValue(string[] argv, string name)
@@ -317,6 +359,48 @@ namespace NikkiPhotoCleaner
             }
         }
 
+        /// <summary>隐藏入口：--shotdata 输出.png first|where —— 把「数据位置」相关窗口渲染成 PNG。</summary>
+        internal static void RunDataDialogShot(string path, string which)
+        {
+            try { SetProcessDPIAware(); } catch { }
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            Form f = null;
+            try
+            {
+                f = string.Equals(which, "first", StringComparison.OrdinalIgnoreCase)
+                    ? (Form)new FirstRunDialog()
+                    : (Form)new DataLocationDialog();
+
+                f.StartPosition = FormStartPosition.Manual;
+                var wa = Screen.PrimaryScreen.WorkingArea;
+                f.Location = new Point(
+                    wa.Left + Math.Max(0, (wa.Width - f.Width) / 2),
+                    wa.Top + Math.Max(0, (wa.Height - f.Height) / 2));
+                f.TopMost = true;
+                f.Show();
+
+                for (var i = 0; i < 16; i++)
+                {
+                    Application.DoEvents();
+                    System.Threading.Thread.Sleep(45);
+                }
+
+                var box = FrameBounds(f);
+                using (var bmp = new Bitmap(box.Width, box.Height))
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.CopyFromScreen(box.Left, box.Top, 0, 0, box.Size);
+                    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+            finally
+            {
+                if (f != null) f.Dispose();
+            }
+        }
+
         /// <summary>隐藏入口：--shotdlg 输出.png 目录 —— 把「清理记录」对话框渲染成 PNG。</summary>
         internal static void RunDialogShot(string path, string screenShot)
         {
@@ -476,14 +560,53 @@ namespace NikkiPhotoCleaner
         public const string PendingZh = "无限暖暖清理助手_待清理照片";
         public const string PendingEn = "NikkiCleaner_ToDelete";
 
-        public static readonly string ToolRoot = ResolveRoot();
+        private static string _toolRoot;
+        private static bool _rootReady;
+        private static bool _english;
+        private static bool _englishReady;
+
+        /// <summary>
+        /// 数据文件夹的父目录。位置由 DataLocation 决定（首次启动问一次，记在 %APPDATA%）。
+        /// 1.8 起不再是 static readonly：用户可能在本次运行里改了位置，
+        /// 缓存必须能被 Rebind() 打掉，否则改动要等下次启动才生效，甚至写回旧目录。
+        /// </summary>
+        public static string ToolRoot
+        {
+            get
+            {
+                if (!_rootReady)
+                {
+                    _toolRoot = DataLocation.BaseDir;
+                    _rootReady = true;
+                }
+                return _toolRoot;
+            }
+        }
 
         /// <summary>
         /// 数据目录用英文名还是中文名。只看「已经存在哪一个」，不看当前界面语言：
         /// 目录一旦建好就锁定，之后切换语言不会换目录，台账和还原记录也就不会断。
         /// 两个都存在时中文优先（旧版本用户升级上来的情况）。
         /// </summary>
-        public static readonly bool DataIsEnglish = ResolveDataIsEnglish();
+        public static bool DataIsEnglish
+        {
+            get
+            {
+                if (!_englishReady)
+                {
+                    _english = ResolveDataIsEnglish();
+                    _englishReady = true;
+                }
+                return _english;
+            }
+        }
+
+        /// <summary>位置变了之后让缓存失效，下一次读取按新位置重新判断。</summary>
+        public static void Rebind()
+        {
+            _rootReady = false;
+            _englishReady = false;
+        }
 
         private static bool ResolveDataIsEnglish()
         {
@@ -514,33 +637,42 @@ namespace NikkiPhotoCleaner
             catch { return false; }
         }
 
-        /// <summary>
-        /// 正常情况取 exe 所在目录；设置环境变量 NIKKI_TOOL_ROOT 可指向别处，
-        /// 便于在隔离目录里跑回归测试而不污染真实数据。
-        /// </summary>
-        private static string ResolveRoot()
+        // 子项名字跟着数据目录走，不跟着界面语言走：保证切换语言后仍在读写同一批文件
+        public static string DataDir
         {
-            try
-            {
-                var env = Environment.GetEnvironmentVariable("NIKKI_TOOL_ROOT");
-                if (!string.IsNullOrEmpty(env) && Directory.Exists(env))
-                    return env.TrimEnd('\\', '/');
-            }
-            catch { }
-            return AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+            get { return Path.Combine(ToolRoot, DataIsEnglish ? DataFolderEn : DataFolderZh); }
         }
 
-        public static readonly string DataDir = Path.Combine(ToolRoot, DataIsEnglish ? DataFolderEn : DataFolderZh);
+        public static string ThumbDir
+        {
+            get { return Path.Combine(DataDir, DataIsEnglish ? "thumbnails" : "缩略图缓存"); }
+        }
 
-        // 子项名字跟着数据目录走，不跟着界面语言走：保证切换语言后仍在读写同一批文件
-        public static readonly string ThumbDir = Path.Combine(DataDir, DataIsEnglish ? "thumbnails" : "缩略图缓存");
-        public static readonly string ReportDir = Path.Combine(DataDir, DataIsEnglish ? "reports" : "网页报告");
-        public static readonly string LedgerPath = Path.Combine(DataDir, DataIsEnglish ? "album-ledger.tsv" : "相册台账.tsv");
-        public static readonly string ConfigPath = Path.Combine(DataDir, DataIsEnglish ? "settings.txt" : "设置.txt");
-        public static readonly string LastMovePath = Path.Combine(DataDir, DataIsEnglish ? "last-move.txt" : "最近一次移动记录.txt");
+        public static string ReportDir
+        {
+            get { return Path.Combine(DataDir, DataIsEnglish ? "reports" : "网页报告"); }
+        }
+
+        public static string LedgerPath
+        {
+            get { return Path.Combine(DataDir, DataIsEnglish ? "album-ledger.tsv" : "相册台账.tsv"); }
+        }
+
+        public static string ConfigPath
+        {
+            get { return Path.Combine(DataDir, DataIsEnglish ? "settings.txt" : "设置.txt"); }
+        }
+
+        public static string LastMovePath
+        {
+            get { return Path.Combine(DataDir, DataIsEnglish ? "last-move.txt" : "最近一次移动记录.txt"); }
+        }
 
         /// <summary>用户对单张照片的手工标记（忽略 / 确认是游戏截图）。</summary>
-        public static readonly string MarkPath = Path.Combine(DataDir, DataIsEnglish ? "user-marks.tsv" : "用户标记.tsv");
+        public static string MarkPath
+        {
+            get { return Path.Combine(DataDir, DataIsEnglish ? "user-marks.tsv" : "用户标记.tsv"); }
+        }
 
         /// <summary>待清理文件夹名。已存在哪个用哪个，避免切换语言后「看不见」之前归拢的照片。</summary>
         public static string PendingFolderName
@@ -1352,6 +1484,7 @@ namespace NikkiPhotoCleaner
         private SoftButton _btnPick;
         private SoftButton _btnRescan;
         private SoftButton _btnLang;
+        private SoftButton _btnData;
         private PillToggle _chkOnlyPending;
         private ListView _list;
         private ListHeader _listHeader;
@@ -1459,11 +1592,23 @@ namespace NikkiPhotoCleaner
             var tipLang = new ToolTip();
             tipLang.SetToolTip(_btnLang, L10n.T("切换界面语言。已经生成的数据文件夹和照片位置不会改变。"));
 
+            // 数据位置：放在语言按钮左边。它不是高频操作，但必须找得到 ——
+            // 有人要挪走数据、有人要卸载，都只会来这里找一次。
+            _btnData = new SoftButton(L10n.T("数据位置"), BtnKind.Ghost, 88) { Height = 28 };
+            _btnData.Font = Theme.F(8.6f);
+            _btnData.Click += (s, e) => ShowDataLocation();
+            var tipData = new ToolTip();
+            tipData.SetToolTip(_btnData, L10n.T("看看使用数据存在哪、挪走它、删掉它，或者彻底卸载。"));
+
+            header.Controls.Add(_btnData);
             header.Controls.Add(_btnLang);
             header.Resize += (s, e) =>
             {
                 _btnLang.Left = Math.Max(0, header.Width - _btnLang.Width);
                 _btnLang.Top = 19;
+
+                _btnData.Left = Math.Max(0, _btnLang.Left - S(6) - _btnData.Width);
+                _btnData.Top = 19;
             };
 
             // ================= 目录行 =================
@@ -1993,6 +2138,25 @@ namespace NikkiPhotoCleaner
             StartScan(false);
             _checked.Clear();
             foreach (var n in keep) _checked.Add(n);
+            RebindList();
+            UpdateStat();
+        }
+
+        /// <summary>「数据位置」：看一眼、挪走、删掉、彻底卸载。</summary>
+        private void ShowDataLocation()
+        {
+            using (var dlg = new DataLocationDialog())
+            {
+                dlg.ShowDialog(this);
+                if (!dlg.Changed) return;
+            }
+
+            // 数据可能刚被删掉或搬走了：重新扫一次，别让界面停在一份已经不存在的台账上
+            if (Headless || DemoMode) return;
+            if (string.IsNullOrEmpty(_screenShot)) { SetEmpty(L10n.T("尚未指定游戏目录")); return; }
+
+            _checked.Clear();
+            StartScan(false);
             RebindList();
             UpdateStat();
         }

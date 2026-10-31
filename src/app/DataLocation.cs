@@ -1,0 +1,388 @@
+using System;
+using System.IO;
+using System.Text;
+
+namespace NikkiPhotoCleaner
+{
+    /// <summary>
+    /// 使用数据的存放位置。
+    ///
+    /// 1.7 及以前是「数据文件夹跟着 exe 走」。把 exe 放桌面时，桌面就会多出一个
+    /// 「无限暖暖清理助手_使用数据」文件夹 —— 用户只是为了方便双击，却换来一个常驻的杂物堆。
+    ///
+    /// 现在首次启动问一次，选择结果记在 %APPDATA%\NikkiPhotoCleaner\location.txt。
+    /// 为什么必须记在 %APPDATA%：记在数据文件夹里等于自指 —— 连文件夹在哪都不知道，
+    /// 就没法从里面读出它在哪。
+    /// </summary>
+    internal static class DataLocation
+    {
+        private const string AppFolder = "NikkiPhotoCleaner";
+        private const string FileName = "location.txt";
+
+        /// <summary>位置是怎么定下来的，用于界面上的措辞和排错。</summary>
+        internal enum Source
+        {
+            /// <summary>环境变量 NIKKI_TOOL_ROOT（回归测试用）</summary>
+            Env,
+            /// <summary>上次用户选的位置</summary>
+            Saved,
+            /// <summary>老用户：exe 旁边已经有数据文件夹，沿用</summary>
+            Existing,
+            /// <summary>兜底：exe 所在目录</summary>
+            ExeDefault
+        }
+
+        private static string _base;
+        private static bool _ask;
+        private static bool _ready;
+        private static Source _source = Source.ExeDefault;
+
+        // ---------------- 指针文件 ----------------
+
+        public static string PointerDir
+        {
+            get
+            {
+                // 回归测试用：把「位置记录」也关进隔离目录，
+                // 否则跑一次测试就会改掉真实用户 %APPDATA% 里的那条记录
+                try
+                {
+                    var ov = Environment.GetEnvironmentVariable("NIKKI_POINTER_DIR");
+                    if (!string.IsNullOrEmpty(ov)) return ov;
+                }
+                catch { }
+
+                var appData = "";
+                try { appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData); }
+                catch { }
+                if (string.IsNullOrEmpty(appData))
+                {
+                    try
+                    {
+                        appData = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                            "AppData", "Roaming");
+                    }
+                    catch { appData = Path.GetTempPath(); }
+                }
+                return Path.Combine(appData, AppFolder);
+            }
+        }
+
+        public static string PointerPath { get { return Path.Combine(PointerDir, FileName); } }
+
+        /// <summary>exe 所在目录。不要用 AppPaths.ToolRoot —— 那个可能已经被用户改到别处了。</summary>
+        public static string ExeDir
+        {
+            get
+            {
+                try { return AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'); }
+                catch { return Directory.GetCurrentDirectory(); }
+            }
+        }
+
+        // ---------------- 解析 ----------------
+
+        /// <summary>数据文件夹的父目录。</summary>
+        public static string BaseDir
+        {
+            get { Ensure(); return _base; }
+        }
+
+        /// <summary>本次启动是否需要问用户把数据放哪。</summary>
+        public static bool AskNeeded
+        {
+            get { Ensure(); return _ask; }
+        }
+
+        public static Source Origin
+        {
+            get { Ensure(); return _source; }
+        }
+
+        /// <summary>上一次的选择（未选择或已失效时返回 null）。</summary>
+        public static string SavedBase
+        {
+            get
+            {
+                var v = ReadPointer();
+                if (v == null) return null;
+                try { return Directory.Exists(v) ? v : null; }
+                catch { return null; }
+            }
+        }
+
+        public static void Ensure()
+        {
+            if (_ready) return;
+            Prepare();
+        }
+
+        /// <summary>
+        /// 决定数据文件夹的父目录。优先级：
+        ///   环境变量（测试） &gt; 上次的选择 &gt; exe 旁已有的数据文件夹 &gt; exe 目录（并询问）
+        /// 只在第一次访问时执行，之后由 Rebind 控制。
+        /// </summary>
+        public static void Prepare()
+        {
+            if (_ready) return;
+            _ready = true;
+
+            // 1) 环境变量：回归测试靠它把数据关进隔离目录，永远不让弹窗插进来
+            try
+            {
+                var env = Environment.GetEnvironmentVariable("NIKKI_TOOL_ROOT");
+                if (!string.IsNullOrEmpty(env) && Directory.Exists(env))
+                {
+                    _base = env.TrimEnd('\\', '/');
+                    _source = Source.Env;
+                    _ask = false;
+                    return;
+                }
+            }
+            catch { }
+
+            // 2) 上次选过的位置。目录被删掉/换盘了就当作没选过，重新判断
+            var saved = SavedBase;
+            if (saved != null)
+            {
+                _base = saved;
+                _source = Source.Saved;
+                _ask = false;
+                return;
+            }
+
+            // 3) 老用户升级上来：exe 旁边已经有数据文件夹。沿用，并且静默记住，别打扰
+            if (HasDataFolder(ExeDir))
+            {
+                _base = ExeDir;
+                _source = Source.Existing;
+                _ask = false;
+                TryRemember(ExeDir);
+                return;
+            }
+
+            // 4) 全新环境：先用 exe 目录兜底，同时标记「要问一下」
+            _base = ExeDir;
+            _source = Source.ExeDefault;
+            _ask = true;
+        }
+
+        /// <summary>让下一次访问重新解析（用户刚改完位置时调用）。</summary>
+        public static void Reset()
+        {
+            _ready = false;
+            _base = null;
+            _ask = false;
+        }
+
+        // ---------------- 记住 / 忘记 ----------------
+
+        public static bool TryRemember(string baseDir)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(baseDir)) return false;
+                Directory.CreateDirectory(PointerDir);
+
+                var lines = new[]
+                {
+                    "# 无限暖暖本地照片清理助手 —— 使用数据放在哪里",
+                    "# 这一行就是答案：数据文件夹（无限暖暖清理助手_使用数据）建在这下面。",
+                    "# 换位置请用程序里的「数据位置」，不要只改这一行，否则旧数据不会跟着走。",
+                    Path.GetFullPath(baseDir).TrimEnd('\\', '/')
+                };
+                File.WriteAllLines(PointerPath, lines, new UTF8Encoding(false));
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public static bool TryNotRemember()
+        {
+            try
+            {
+                if (File.Exists(PointerPath)) File.Delete(PointerPath);
+                try { if (Directory.Exists(PointerDir) && Directory.GetFileSystemEntries(PointerDir).Length == 0) Directory.Delete(PointerDir); }
+                catch { }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        private static string ReadPointer()
+        {
+            try
+            {
+                if (!File.Exists(PointerPath)) return null;
+                foreach (var raw in File.ReadAllLines(PointerPath, Encoding.UTF8))
+                {
+                    var s = raw.Trim().Trim('"');
+                    if (s.Length == 0 || s.StartsWith("#")) continue;
+                    return s.TrimEnd('\\', '/');
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // ---------------- 目录名 ----------------
+
+        public static string DataFolderName(bool english)
+        {
+            return english ? AppPaths.DataFolderEn : AppPaths.DataFolderZh;
+        }
+
+        /// <summary>在某个父目录下，数据文件夹的完整路径。</summary>
+        public static string DataPathIn(string baseDir, bool english)
+        {
+            try { return Path.Combine(baseDir, DataFolderName(english)); }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// 预览用：这个位置上数据文件夹会叫什么。
+        /// 已经有哪一个就沿用哪一个（和主程序的判定一致），都没有才按界面语言起名。
+        /// 不然英文界面会预告一个 NikkiCleaner_Data，实际建出来的却是旁边的中文旧目录。
+        /// </summary>
+        public static string DataPathFor(string baseDir, bool preferEnglish)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(baseDir)) return null;
+                if (Directory.Exists(Path.Combine(baseDir, AppPaths.DataFolderZh)))
+                    return Path.Combine(baseDir, AppPaths.DataFolderZh);
+                if (Directory.Exists(Path.Combine(baseDir, AppPaths.DataFolderEn)))
+                    return Path.Combine(baseDir, AppPaths.DataFolderEn);
+                return DataPathIn(baseDir, preferEnglish);
+            }
+            catch { return null; }
+        }
+
+        public static bool HasDataFolder(string baseDir)
+        {
+            if (string.IsNullOrEmpty(baseDir)) return false;
+            try
+            {
+                return Directory.Exists(Path.Combine(baseDir, AppPaths.DataFolderZh))
+                    || Directory.Exists(Path.Combine(baseDir, AppPaths.DataFolderEn));
+            }
+            catch { return false; }
+        }
+
+        // ---------------- 推荐位置：与游戏文件夹并列 ----------------
+
+        /// <summary>
+        /// 从截图目录推出「和游戏文件夹并列」的那一级。
+        ///
+        ///   …\InfinityNikki_APP\InfinityNikki\X6Game\ScreenShot
+        ///                          ↑ 从下往上找名叫 InfinityNikki 的那一段，取它的父级
+        ///   ⇒ …\InfinityNikki_APP
+        ///
+        /// 为什么放这一级：既不会被游戏更新/校验碰到（不在游戏目录内），
+        /// 又和游戏一起在同一个盘、同一个大目录里，用户找得到。
+        /// </summary>
+        public static string SiblingOf(string screenShotDir)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(screenShotDir)) return null;
+
+                var full = Path.GetFullPath(screenShotDir.Trim().Trim('"')).TrimEnd('\\', '/');
+                var parts = full.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+
+                for (var i = parts.Length - 1; i >= 0; i--)
+                {
+                    if (!string.Equals(parts[i], "InfinityNikki", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    // 这一段已经是盘根后的第一级，没有可用的父级
+                    if (i == 0) return null;
+
+                    var parent = string.Join("\\", parts, 0, i);
+                    // "D:" 这类盘根不往里放东西
+                    if (parent.Length <= 2 || parent.EndsWith(":")) return null;
+
+                    return parent;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
+        /// 猜一个推荐位置。找不到游戏目录就返回 null（调用方据此把选项置灰）。
+        /// 这里会触发一次目录扫描，只应在首次启动的那一次调用。
+        /// </summary>
+        public static string SuggestNearGame()
+        {
+            try
+            {
+                var ss = GameLocator.Auto();
+                return SiblingOf(ss);
+            }
+            catch { return null; }
+        }
+
+        // ---------------- 卸载相关 ----------------
+
+        /// <summary>统计一个目录里的文件数与总字节数，用于删除前的警告。</summary>
+        public static void Measure(string dir, out int files, out long bytes)
+        {
+            files = 0;
+            bytes = 0;
+            try
+            {
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+                foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                {
+                    files++;
+                    try { bytes += new FileInfo(f).Length; } catch { }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// 只允许删「看起来确实是我们的数据文件夹」的目录。
+        /// 名字对不上、正好是 exe 目录、或者是盘根，一律拒绝 —— 这个函数宁可误拒。
+        /// </summary>
+        public static bool IsDeletableDataDir(string dir)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(dir)) return false;
+
+                var full = Path.GetFullPath(dir).TrimEnd('\\', '/');
+                if (full.Length <= 3) return false;                       // C:\ 之类
+
+                var name = Path.GetFileName(full);
+                if (!string.Equals(name, AppPaths.DataFolderZh, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(name, AppPaths.DataFolderEn, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                if (string.Equals(full, ExeDir, StringComparison.OrdinalIgnoreCase)) return false;
+                return Directory.Exists(full);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>递归复制目录，已存在的同名文件保留原样（宁可少覆盖）。</summary>
+        public static int CopyDir(string from, string to)
+        {
+            var n = 0;
+            if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to)) return 0;
+            if (!Directory.Exists(from)) return 0;
+
+            Directory.CreateDirectory(to);
+            foreach (var f in Directory.GetFiles(from))
+            {
+                var t = Path.Combine(to, Path.GetFileName(f));
+                if (File.Exists(t)) continue;
+                try { File.Copy(f, t, false); n++; } catch { }
+            }
+            foreach (var d in Directory.GetDirectories(from))
+                n += CopyDir(d, Path.Combine(to, Path.GetFileName(d)));
+            return n;
+        }
+    }
+}
