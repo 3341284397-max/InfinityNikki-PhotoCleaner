@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 **[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
 
-**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
+**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.1/NikkiPhotoCleaner.exe) (direct link, no login needed).
 
 A third option: [Baidu Wangpan](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) — code `1111`. It holds the full bundle (exe + Chinese readme + screenshots + the dependency-free fallback), which is the one to use when neither code host is reachable.
 
@@ -275,21 +275,30 @@ Designed so that a mis-click still cannot lose a photo:
 
 ## Where files go
 
-**On first launch the app asks once**, because the default (next to the exe) is unfriendly
-to anyone who keeps the exe on the desktop — it would leave a permanent folder there. Three choices:
+**The first launch just runs; the question comes later, once the game folder is known.**
+The app starts with its data next to the exe (the way it worked up to 1.7) and asks you for
+`X6Game\ScreenShot`. Only then can a location "next to the game" be computed — and only then
+does it ask whether to move the data there:
 
 | Choice | Data lives in |
 |---|---|
-| Next to the game folder (recommended) | The **parent** of the segment named `InfinityNikki` in your screenshot path (`<…>\InfinityNikki\X6Game\ScreenShot`) — usually `InfinityNikki_APP`, side by side with the `InfinityNikki` folder |
-| Same folder as the exe | The exe's own folder (the default up to 1.7) |
+| Move next to the game (recommended) | The **parent** of the segment named `InfinityNikki` in your screenshot path (`<…>\InfinityNikki\X6Game\ScreenShot`) — usually `InfinityNikki_APP`, side by side with the `InfinityNikki` folder |
+| Leave it where it is | The exe's own folder, unchanged |
 | Pick a folder myself | Anywhere |
+
+Choosing "move" goes through the same path as "Change location": copy → verify file count and
+total bytes → delete the old folder.
+
+Why not ask at startup: before you have pointed the app at a screenshot folder, the recommended
+location cannot be computed — the only definite choice would be "next to the exe", which means
+asking a question you cannot answer yet.
 
 The answer is stored in `%APPDATA%\NikkiPhotoCleaner\location.txt`.
 It cannot live inside the data folder itself: the location is the thing being recorded, so that would be self-referential.
 
 Upgrading users **never see this dialog** — if a data folder already sits next to the exe, it is adopted silently and remembered.
 
-![Choosing where the data goes on first launch](docs/screenshots/data-en.png)
+![Asking where the data should go, once the game folder is known](docs/screenshots/data-en.png)
 
 
 Inside the data folder:
@@ -318,9 +327,9 @@ Three things live behind **Data location** in the top-right corner:
   Existing files are never overwritten, and a location that already holds a data folder is refused,
   because merging two ledgers would scramble the "deleted in game" verdicts
 - **Delete app data** — removes the folder **entirely** (the folder itself, not just its contents),
-  clears the `location.txt` record, and **exits the app**. The next launch asks where to keep data
-  again — that is your proof it worked. Photos are untouched; if the review folder still holds
-  some, you are told
+  clears the `location.txt` record, and **exits the app**. The next launch starts fresh next to the
+  exe and asks again once the game folder is known — seeing that dialog again is your proof it
+  worked. Photos are untouched; if the review folder still holds some, you are told
 
 ![Data location](docs/screenshots/data-manage-en.png)
 
@@ -360,7 +369,7 @@ dotnet build -c Release
 ```
 src/app/        C# WinForms sources (Program.cs / DataLocation.cs / DataDialogs.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs)
 src/scripts/    Zero-dependency PowerShell version (lang/PhotoSync.en.ps1 holds the English strings)
-src/test/       Regression host (net8); run-tests.sh covers 27 cases
+src/test/       Regression host (net8); run-tests.sh covers 28 cases
 web/            Static web version (index.html / styles.css / app.js)
 package/        Four double-click .bat launchers, in Chinese and English
 src/pack/       Builds the share package for cloud drives (exe + 使用说明.txt + screenshots)
@@ -380,7 +389,8 @@ the stored data-location record and its fallback when stale (18–20), the game-
 an end-to-end run proving the data does not land back next to the exe (22),
 **a tag never rewriting the verdict** (23 — the 1.1 / 1.2 regression),
 the review view listing and selectively restoring (24), no duplicate copies on restore (25),
-the folder itself disappearing after "delete app data" (26), and the old folder being removed after a move (27).
+the folder itself disappearing after "delete app data" (26), the old folder being removed after a move (27),
+and **a chosen location taking effect right away** (28 — the "chose it, nothing happened" regression).
 
 ## Known limitations
 

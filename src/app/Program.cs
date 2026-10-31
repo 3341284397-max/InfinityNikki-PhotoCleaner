@@ -84,9 +84,19 @@ namespace NikkiPhotoCleaner
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // 首次启动先问数据放哪，再让主界面开工。
-            // 顺序很重要：读设置文件会触发 AppPaths 解析，位置一旦按 exe 目录定下来就改不了了。
-            AskWhereToKeepData();
+            // 「数据放哪」这个问题不在建界面之前问。
+            //
+            // 1.9.0 及以前先弹「使用数据放在哪里」再进主界面，可那时候用户连游戏目录都
+            // 还没指定，推荐位置根本算不出来（自动找一次游戏目录也可能扫不到），
+            // 三张卡里只有「和 exe 同目录」是确定的 —— 等于问了一个当时答不上来的问题。
+            //
+            // 现在：先按 exe 同目录开工，等主界面里定位到 ScreenShot 之后，
+            // 由 MainForm 拿着真实路径再问一次「要不要挪去和游戏并列」。
+            //
+            // Ensure() 在这里先跑一次是有意的：此刻还没有任何文件夹被建出来，
+            // 「全新环境 → 要问」这个判断才是准的；等台账写完再判断就变成「已有数据」了。
+            DataLocation.Ensure();
+            AppPaths.Rebind();
             L10n.Init(ArgValue(argv, "--lang"));
 
             // 上次「更改位置 / 删除使用数据」没删干净的旧文件夹，趁现在还没有任何句柄补一刀。
@@ -94,36 +104,6 @@ namespace NikkiPhotoCleaner
             DataLocation.ProcessRemovalQueue();
 
             Application.Run(new MainForm());
-        }
-
-        /// <summary>
-        /// 只有「全新环境」才问：没选过位置，exe 旁边也没有现成的数据文件夹。
-        /// 老用户升级上来沿用原位置，不会看到这个窗口。
-        /// </summary>
-        private static void AskWhereToKeepData()
-        {
-            if (!DataLocation.AskNeeded) { AppPaths.Rebind(); return; }
-
-            try
-            {
-                using (var dlg = new FirstRunDialog())
-                {
-                    var r = dlg.ShowDialog();
-                    var chosen = dlg.ChosenBase;
-                    // 用户直接关窗口＝不想现在决定，按默认位置（exe 旁边）记下来，别每次都问
-                    if (r != DialogResult.OK || string.IsNullOrEmpty(chosen)) chosen = DataLocation.ExeDir;
-
-                    DataLocation.TryRemember(chosen);
-                }
-            }
-            catch
-            {
-                // 弹窗出问题不能挡住启动：退回 exe 同目录继续跑
-            }
-            finally
-            {
-                AppPaths.Rebind();
-            }
         }
 
         private static string ArgValue(string[] argv, string name)
@@ -379,7 +359,7 @@ namespace NikkiPhotoCleaner
             try
             {
                 f = string.Equals(which, "first", StringComparison.OrdinalIgnoreCase)
-                    ? (Form)new FirstRunDialog()
+                    ? (Form)new FirstRunDialog(@"D:\G2_InfinityNikki\InfinityNikki_APP\InfinityNikki\X6Game\ScreenShot")
                     : (Form)new DataLocationDialog();
 
                 f.StartPosition = FormStartPosition.Manual;
@@ -1733,6 +1713,9 @@ namespace NikkiPhotoCleaner
         internal bool Headless;
         internal bool DemoMode;
 
+        /// <summary>「使用数据要不要挪位置」这次启动已经问过了（只问一次）</summary>
+        private bool _askedData;
+
         private static readonly Color Bg = Theme.Bg;
         private static readonly Color Line = Theme.Line;
 
@@ -2911,6 +2894,123 @@ namespace NikkiPhotoCleaner
                 UseWaitCursor = false;
                 Cursor = Cursors.Default;
             }
+
+            // 扫描成功、游戏目录也有了，这时候才问得出「要不要把数据挪到游戏旁边」。
+            MaybeAskDataLocation();
+        }
+
+        /// <summary>
+        /// 定位到游戏目录之后问一次数据放哪。
+        ///
+        /// 1.9.0 及以前是在建界面之前问的：那时候 ScreenShot 还没指定，
+        /// 推荐位置算不出来（自动扫盘也可能扫不到），三张卡里只有「和 exe 同目录」是确定的；
+        /// 更糟的是选完写进记录、缓存却没失效，位置其实没生效，数据照旧写回 exe 旁边。
+        /// 所以这里把问题挪到拿到真实路径之后再问，并且只在「全新环境」问一次。
+        /// </summary>
+        private void MaybeAskDataLocation()
+        {
+            if (Headless || DemoMode || _askedData) return;
+            if (_result == null) return;                       // 没扫成功就别问，问了也没上下文
+            if (!DataLocation.AskNeeded) { _askedData = true; return; }
+
+            _askedData = true;
+
+            var cur = AppPaths.ToolRoot;
+            var suggest = DataLocation.SiblingOf(_screenShot);
+
+            // 推不出并列位置（比如游戏装在盘根一级），或者当前就在推荐位置上：不打扰，记下别再问
+            if (string.IsNullOrEmpty(suggest) || SamePath(suggest, cur))
+            {
+                DataLocation.SwitchTo(cur);
+                return;
+            }
+
+            string chosen;
+            try
+            {
+                using (var dlg = new FirstRunDialog(_screenShot))
+                {
+                    // 直接关窗口＝不想现在决定。记住当前位置，别每次启动都问一遍
+                    chosen = dlg.ShowDialog(this) == DialogResult.OK ? dlg.ChosenBase : cur;
+                }
+            }
+            catch
+            {
+                chosen = cur;
+            }
+
+            if (string.IsNullOrEmpty(chosen) || SamePath(chosen, cur))
+            {
+                DataLocation.SwitchTo(cur);
+                return;
+            }
+
+            // 目标位置上已经有数据文件夹就不搬：两份台账混在一起会把判定搞乱
+            var dst = DataLocation.DataPathFor(chosen, AppPaths.DataIsEnglish);
+            var existing = 0;
+            try { existing = Directory.GetFileSystemEntries(dst).Length; } catch { }
+            if (existing > 0)
+            {
+                MessageBox.Show(this,
+                    L10n.F("那个位置上已经有一个数据文件夹了，里面还有 {0} 项内容。\n\n"
+                         + "两份台账混在一起会把「已删除」判断搞乱，所以这次没有搬。\n"
+                         + "数据还在原处，你可以在右上角「数据位置」里换个空位置。", existing),
+                    L10n.T("这里已经有数据了"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DataLocation.SwitchTo(cur);
+                return;
+            }
+
+            if (!FirstRunDialog.CanWrite(chosen))
+            {
+                MessageBox.Show(this, L10n.F("这个位置写不进去：\n{0}\n\n数据还在原处。", chosen),
+                    L10n.T("换个位置"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DataLocation.SwitchTo(cur);
+                return;
+            }
+
+            int copied;
+            string err, leftover;
+            Cursor = Cursors.WaitCursor;
+            UseWaitCursor = true;
+            Application.DoEvents();
+            var ok = DataLocation.MoveDataTo(chosen, out copied, out err, out leftover);
+            UseWaitCursor = false;
+            Cursor = Cursors.Default;
+
+            if (!ok)
+            {
+                // 搬失败不要紧：核对没过时旧数据一个都没删，切回原处继续用
+                DataLocation.SwitchTo(cur);
+                MessageBox.Show(this, err, L10n.T("没有搬成"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // 三件事一起做：写记录、让解析缓存作废、让 AppPaths 重新取路径。
+            // 少做一步就会出现「界面说搬了、其实还在写旧目录」。
+            DataLocation.SwitchTo(chosen);
+
+            // 缩略图缓存、设置、台账都换了地方；照片列表本身不变，刷新一下依赖路径的显示即可
+            ReloadPending();
+            UpdateStat();
+
+            var msg = L10n.F("已经把 {0} 个文件搬到：\n{1}", copied, dst);
+            if (leftover != null)
+                msg += "\n\n" + L10n.F("旧文件夹还有东西被别的程序占着，暂时没删掉：\n{0}\n"
+                                     + "已经记下来了，下次启动会先把它删干净。", leftover);
+            else
+                msg += "\n\n" + L10n.T("旧文件夹已经删掉了，现在只剩这一份，两边的台账不会再打架。");
+            MessageBox.Show(this, msg, L10n.T("搬完了"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private static bool SamePath(string a, string b)
+        {
+            try
+            {
+                return string.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'),
+                                     Path.GetFullPath(b).TrimEnd('\\', '/'),
+                                     StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
         }
 
         private void SetEmpty(string hint)

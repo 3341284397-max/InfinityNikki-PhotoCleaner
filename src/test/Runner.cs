@@ -120,6 +120,11 @@ namespace NikkiPhotoCleaner
                     // deltada：删数据文件夹本身，验证删完文件夹真的不见了
                     Console.Write(DeleteData());
                     return 0;
+
+                case "commit":
+                    // commit <新父目录>：模拟用户当场选完位置，验证立刻生效（不用重启）
+                    Console.Write(CommitLocation(args[1]));
+                    return 0;
             }
 
             Console.WriteLine("未知命令: " + args[0]);
@@ -404,6 +409,30 @@ namespace NikkiPhotoCleaner
             sb.AppendLine("删除成功=" + (gone ? "1" : "0"));
             sb.AppendLine("目录还在=" + (Directory.Exists(dir) ? "1" : "0"));
             if (err != null) sb.AppendLine("错误=" + err);
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// commit &lt;新父目录&gt;：模拟「用户这次启动里刚选完位置」。
+        ///
+        /// 专门盯 1.9.0 那个 bug：记录了、AppPaths 也 Rebind 了，
+        /// 但 DataLocation 自己缓存的旧解析没作废 —— 于是选完位置在本次运行里根本没生效，
+        /// 数据照旧写回 exe 旁边。这条用例断言「当场生效」，不靠重启。
+        /// </summary>
+        private static string CommitLocation(string newBase)
+        {
+            var before = AppPaths.DataDir;
+            DataLocation.SwitchTo(newBase);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("切换前=" + before);
+            sb.AppendLine("切换后=" + AppPaths.DataDir);
+            sb.AppendLine("数据目录在目标下=" + (AppPaths.DataDir.StartsWith(
+                Path.GetFullPath(newBase).TrimEnd('\\', '/') + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) ? "1" : "0"));
+            sb.AppendLine("AskNeeded=" + (DataLocation.AskNeeded ? "1" : "0"));
+            sb.AppendLine("Source=" + DataLocation.Origin);
+            sb.AppendLine("指针值=" + (DataLocation.SavedBase ?? "(null)"));
             return sb.ToString();
         }
     }

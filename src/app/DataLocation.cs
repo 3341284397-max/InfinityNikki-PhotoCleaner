@@ -176,6 +176,25 @@ namespace NikkiPhotoCleaner
             _ready = false;
             _base = null;
             _ask = false;
+            _source = Source.ExeDefault;
+        }
+
+        /// <summary>
+        /// 用户刚选完位置：写记录 → 让这次解析作废 → 让 AppPaths 重新取路径。
+        ///
+        /// 三件事必须一起做，少一件都不算数。1.8/1.9.0 只做了前两件里的第一件加
+        /// <c>AppPaths.Rebind()</c>，唯独漏了 <see cref="Reset"/> ——
+        /// 于是 <see cref="BaseDir"/> 里缓存的还是启动时那次的 exe 目录，
+        /// 「跟随游戏放在一起」「自己选一个位置」全都不生效：数据照旧写回 exe 旁边，
+        /// 界面「数据位置」里显示的也还是旧路径，重启一次才对得上。
+        /// 所以别再手写这三步，统一走这里。
+        /// </summary>
+        public static bool SwitchTo(string baseDir)
+        {
+            var ok = TryRemember(baseDir);
+            Reset();
+            AppPaths.Rebind();
+            return ok;
         }
 
         // ---------------- 记住 / 忘记 ----------------

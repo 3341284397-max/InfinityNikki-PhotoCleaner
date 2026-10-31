@@ -19,7 +19,7 @@
      国内 CDN 走 Gitee，GitHub 当备用。
      文案里的 <a class="exe-link"> 统一由 relinkExe() 补地址；index.html 里写死的
      href 则是没有 JS 时的兜底，改地址时两边都要动。 */
-  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.0/NikkiPhotoCleaner.exe';
+  var EXE_URL = 'https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.1/NikkiPhotoCleaner.exe';
   var EXE_URL_ALT = 'https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe';
   /* 第三个入口：网盘整包（exe + GBK 中文说明 + 截图 + 零依赖版）。
      两个代码托管都连不上、或想要一份「给人看」的说明时用它。

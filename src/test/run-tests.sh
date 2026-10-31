@@ -442,5 +442,41 @@ grep -q "待删清单=无" <<< "$OUTM" \
 rm -rf "$NEWHOME"
 
 echo
+echo "========== 28. 选完数据位置当场生效，不用重启 =========="
+# 必须去掉 NIKKI_TOOL_ROOT 才测得到：那个变量优先级最高，会把「要不要问」直接压成 0。
+PTR="$(pwd)/_tmp_ptr_loc"
+LOCROOT="$(pwd)/_tmp_loc"
+rm -rf "$PTR" "$LOCROOT"
+LOCBASE="$LOCROOT/G2_InfinityNikki/InfinityNikki_APP"
+mkdir -p "$LOCBASE/InfinityNikki/X6Game/ScreenShot"
+SSDEMO="$(cygpath -w "$LOCBASE/InfinityNikki/X6Game/ScreenShot")"
+NEWLOC="$(cygpath -w "$LOCBASE")"
+
+SUG=$(env -u NIKKI_TOOL_ROOT dotnet --roll-forward Major "$DLL" sibling "$SSDEMO")
+echo "  截图目录：$SSDEMO"
+echo "  推出的推荐位置：$SUG"
+[ "$(echo "$SUG" | tr 'A-Z' 'a-z')" = "$(echo "$NEWLOC" | tr 'A-Z' 'a-z')" ] \
+  && echo "  [OK] 有真实截图目录时能算出「与游戏并列」那一级" \
+  || { echo "  [FAIL] 推荐位置推导不对"; FAIL=1; }
+
+OUTC=$(env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$(cygpath -w "$PTR")" NIKKI_LANG="$NIKKI_LANG" \
+       dotnet --roll-forward Major "$DLL" commit "$NEWLOC")
+echo "$OUTC" | sed 's/^/  /'
+grep -q "数据目录在目标下=1" <<< "$OUTC" \
+  && echo "  [OK] 选完后数据目录立刻指向新位置（1.9.0 的「选了不生效」已修）" \
+  || { echo "  [FAIL] 选完了数据目录还在旧地方 —— 缓存没失效"; FAIL=1; }
+grep -q "AskNeeded=0" <<< "$OUTC" \
+  && echo "  [OK] 记下之后不再问第二次" \
+  || { echo "  [FAIL] 还会再问"; FAIL=1; }
+grep -q "Source=Saved" <<< "$OUTC" \
+  && echo "  [OK] 位置来源变成「上次的选择」" \
+  || { echo "  [FAIL] 来源不对"; FAIL=1; }
+[ "$(grep -c '切换前=' <<< "$OUTC")" = "1" ] && [ "$(sed -n 's/^切换前=//p' <<< "$OUTC")" != "$(sed -n 's/^切换后=//p' <<< "$OUTC")" ] \
+  && echo "  [OK] 新旧路径确实不是一个地方（不是空转）" \
+  || { echo "  [FAIL] 切换前后一样，用例没测到东西"; FAIL=1; }
+
+rm -rf "$PTR" "$LOCROOT"
+
+echo
 echo "全部用例执行完毕。测试目录：$ROOT 与 $TAG"
 exit $FAIL

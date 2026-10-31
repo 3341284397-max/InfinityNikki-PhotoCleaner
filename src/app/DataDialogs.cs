@@ -112,19 +112,22 @@ namespace NikkiPhotoCleaner
     }
 
     /// <summary>
-    /// 首次启动时问一次：使用数据放哪。
+    /// 定位到游戏目录之后问一次：使用数据要不要挪去和游戏放在一起。
     ///
-    /// 这个问题不适合「默认帮你决定」：放桌面会让桌面多一个常驻文件夹，
-    /// 放游戏目录又可能被校验碰到，放 Program Files 还可能写不进去。
-    /// 所以给三个具体的位置，每个都直接显示最终路径，看得见再选。
+    /// 为什么挪到这里问：建界面之前用户还没指定 ScreenShot 目录，推荐位置根本算不出来，
+    /// 三张卡里只有「和 exe 同目录」是确定的 —— 那等于问了一个当时答不上来的问题。
+    /// 现在拿到真实路径才问，推荐那一栏是真的路径，不选也只是维持现状。
+    ///
+    /// 为什么不默认帮你搬：搬动数据会换掉台账所在的地方，这种事必须让用户点一下头。
     /// </summary>
     internal class FirstRunDialog : Form
     {
         private readonly float _scale;
         private readonly string _gameBase;
+        private readonly string _currentBase;
         private readonly bool _en;
 
-        private OptionCard _cardGame, _cardExe, _cardCustom;
+        private OptionCard _cardGame, _cardCurrent, _cardCustom;
         private string _customBase;
         private Panel _foot;
         private SoftButton _btnOk, _btnDefault;
@@ -135,10 +138,12 @@ namespace NikkiPhotoCleaner
 
         private int S(int v) { return (int)Math.Round(v * _scale); }
 
-        public FirstRunDialog()
+        /// <param name="screenShot">已经定位到的 ScreenShot 目录；给 null 时自己去猜一次（截图入口用）。</param>
+        public FirstRunDialog(string screenShot = null)
         {
             _scale = DeviceDpi / 96f;
             _en = L10n.IsEnglish;
+            _currentBase = AppPaths.ToolRoot;
 
             Text = L10n.T("使用数据放在哪里");
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -151,10 +156,18 @@ namespace NikkiPhotoCleaner
             AutoScaleMode = AutoScaleMode.Dpi;
             try { Icon = Theme.WindowIcon; } catch { }
 
-            // 找一次游戏目录（内部有时间上限）。找不到就把「跟随游戏」那张卡置灰。
-            Cursor = Cursors.WaitCursor;
-            _gameBase = DataLocation.SuggestNearGame();
-            Cursor = Cursors.Default;
+            // 有了 ScreenShot 就直接按它推「与游戏并列」那一级，纯字符串运算，不扫盘；
+            // 没给才退回自动找（有 12 秒上限，只应发生在截图入口）。
+            if (screenShot != null)
+            {
+                _gameBase = DataLocation.SiblingOf(screenShot);
+            }
+            else
+            {
+                Cursor = Cursors.WaitCursor;
+                _gameBase = DataLocation.SuggestNearGame();
+                Cursor = Cursors.Default;
+            }
 
             Build();
         }
@@ -171,10 +184,11 @@ namespace NikkiPhotoCleaner
             var pad = S(26);
             var innerW = W - pad * 2;
 
-            var title = L10n.T("先把使用数据放到哪里");
-            var sub = L10n.T("程序需要一个小文件夹来存相册台账、你标过的「忽略」、设置和缩略图缓存。"
-                           + "如果你习惯把 exe 放在桌面上直接双击，它会顺手在桌面建一个文件夹 —— 所以先问你一句。"
-                           + "选错了不要紧，之后在右上角「数据位置」里随时能改。");
+            var title = L10n.T("使用数据要不要挪个位置");
+            var sub = L10n.T("程序已经在 exe 旁边建好了「使用数据」文件夹 —— 相册台账、你标过的「忽略」、设置都在里面。"
+                           + "现在定位到游戏目录了，所以能给一个更合适的位置：和游戏文件夹放在一起，"
+                           + "既不会被游戏更新校验碰到，也不会一直留在桌面/下载文件夹里。"
+                           + "不挪也行，之后在右上角「数据位置」里随时能改。");
 
             var subH = TextRenderer.MeasureText(sub, Theme.F(8.6f), new Size(innerW, 0),
                 TextFormatFlags.WordBreak).Height;
@@ -225,21 +239,20 @@ namespace NikkiPhotoCleaner
 
             var en = _en;
 
-            // ① 跟随游戏
+            // ① 和游戏放一起
             var gamePath = _gameBase == null ? null : DataLocation.DataPathFor(_gameBase, en);
             _cardGame = new OptionCard(_scale)
             {
-                Text = L10n.T("跟随游戏放在一起（推荐）"),
-                SubText = gamePath ?? L10n.T("没找到游戏目录，可用下面两个选项"),
+                Text = L10n.T("搬到游戏旁边（推荐）"),
+                SubText = gamePath ?? L10n.T("这个游戏目录推不出并列位置，用下面两个选项"),
                 Enabled = gamePath != null
             };
 
-            // ② exe 旁边
-            var exePath = DataLocation.DataPathFor(DataLocation.ExeDir, en);
-            _cardExe = new OptionCard(_scale)
+            // ② 维持现状：数据此刻就在这儿，选它等于「别问了」
+            _cardCurrent = new OptionCard(_scale)
             {
-                Text = L10n.T("和 exe 放在同一个文件夹"),
-                SubText = exePath
+                Text = L10n.T("先不动它"),
+                SubText = AppPaths.DataDir
             };
 
             // ③ 自己选
@@ -249,10 +262,10 @@ namespace NikkiPhotoCleaner
                 SubText = L10n.T("点这张卡会弹出文件夹选择框")
             };
 
-            foreach (var c in new[] { _cardGame, _cardExe, _cardCustom }) body.Controls.Add(c);
+            foreach (var c in new[] { _cardGame, _cardCurrent, _cardCustom }) body.Controls.Add(c);
 
             _cardGame.Picked += (s, e) => Select(_cardGame);
-            _cardExe.Picked += (s, e) => Select(_cardExe);
+            _cardCurrent.Picked += (s, e) => Select(_cardCurrent);
             _cardCustom.Picked += (s, e) =>
             {
                 if (PickFolder()) Select(_cardCustom);
@@ -282,8 +295,8 @@ namespace NikkiPhotoCleaner
                 Text = L10n.T("只管程序自己的数据，不动游戏文件，也不动照片。")
             };
 
-            _btnDefault = new SoftButton(L10n.T("用默认位置"), BtnKind.Ghost, S(104));
-            _btnDefault.Click += (s, e) => { ChosenBase = DataLocation.ExeDir; DialogResult = DialogResult.OK; Close(); };
+            _btnDefault = new SoftButton(L10n.T("先不挪"), BtnKind.Ghost, S(104));
+            _btnDefault.Click += (s, e) => { ChosenBase = _currentBase; DialogResult = DialogResult.OK; Close(); };
 
             _btnOk = new SoftButton(L10n.T("就用这里"), BtnKind.Primary, S(104));
             _btnOk.PadX = 16;
@@ -309,8 +322,8 @@ namespace NikkiPhotoCleaner
                 else if (e.KeyCode == Keys.Enter) Accept();
             };
 
-            // 默认选「跟随游戏」，找不到游戏就退到「和 exe 同目录」
-            Select(_cardGame.Enabled ? _cardGame : _cardExe);
+            // 默认停在推荐的那张；推不出并列位置就退到「先不动它」（风险最小的选项）
+            Select(_cardGame.Enabled ? _cardGame : _cardCurrent);
             LayoutFoot();
             LayoutCards();
         }
@@ -327,7 +340,7 @@ namespace NikkiPhotoCleaner
 
             var w = Math.Max(S(200), ClientSize.Width - _pad * 2);
             var y = 0;
-            foreach (var c in new[] { _cardGame, _cardExe, _cardCustom })
+            foreach (var c in new[] { _cardGame, _cardCurrent, _cardCustom })
             {
                 c.SetBounds(_pad, y, w, _cardH);
                 y += _cardH + _cardGap;
@@ -352,7 +365,7 @@ namespace NikkiPhotoCleaner
 
         private void Select(OptionCard card)
         {
-            foreach (var c in new[] { _cardGame, _cardExe, _cardCustom })
+            foreach (var c in new[] { _cardGame, _cardCurrent, _cardCustom })
             {
                 if (c == null) continue;
                 c.Selected = ReferenceEquals(c, card);
@@ -381,7 +394,7 @@ namespace NikkiPhotoCleaner
         private string CurrentBase()
         {
             if (_cardGame.Selected) return _gameBase;
-            if (_cardExe.Selected) return DataLocation.ExeDir;
+            if (_cardCurrent.Selected) return _currentBase;
             return _customBase;
         }
 
@@ -712,8 +725,7 @@ namespace NikkiPhotoCleaner
                 return;
             }
 
-            DataLocation.TryRemember(baseDir);
-            AppPaths.Rebind();
+            DataLocation.SwitchTo(baseDir);
             Changed = true;
 
             var msg = L10n.F("已经把 {0} 个文件搬到：\n{1}", copied, dst);
