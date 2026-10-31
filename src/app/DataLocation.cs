@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace NikkiPhotoCleaner
@@ -383,6 +385,172 @@ namespace NikkiPhotoCleaner
             foreach (var d in Directory.GetDirectories(from))
                 n += CopyDir(d, Path.Combine(to, Path.GetFileName(d)));
             return n;
+        }
+
+        // ---------------- 改位置：复制 → 校验 → 删旧 ----------------
+
+        /// <summary>
+        /// 把数据文件夹整个搬到 <paramref name="targetBase"/> 下面。
+        ///
+        /// 1.8 只复制不删旧，用户改完位置会发现原地还留着一份，两边还都可能被继续写 ——
+        /// 那等于把「搬」做成了「复制」，改天两边台账不一样，判定就对不上了。
+        /// 现在复制后会核对文件数与总字节，对得上才删旧；删不掉（被占用）就登记到待删清单，
+        /// 下次启动第一件事处理，绝不假装成功。
+        /// </summary>
+        public static bool MoveDataTo(string targetBase, out int copied, out string error, out string leftover)
+        {
+            copied = 0;
+            error = null;
+            leftover = null;
+
+            try
+            {
+                var from = AppPaths.DataDir;
+                var to = DataPathFor(targetBase, AppPaths.DataIsEnglish);
+
+                if (string.IsNullOrEmpty(to)) { error = L10n.T("新位置不可用。"); return false; }
+                if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase))
+                {
+                    error = L10n.T("新位置和现在的位置是同一个地方。");
+                    return false;
+                }
+                // 目标落在旧的里面（或反过来）：先复制再删就会把自己删掉
+                if (to.StartsWith(from + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                    from.StartsWith(to + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    error = L10n.T("新位置不能是旧位置的上层或下层文件夹。");
+                    return false;
+                }
+
+                if (!Directory.Exists(from))
+                {
+                    // 还没有数据（第一次启动就改位置）：建个空目录就算搬完了
+                    Directory.CreateDirectory(to);
+                    return true;
+                }
+
+                copied = CopyDir(from, to);
+
+                int f1, f2; long b1, b2;
+                Measure(from, out f1, out b1);
+                Measure(to, out f2, out b2);
+                if (f2 < f1 || b2 < b1)
+                {
+                    error = L10n.F("复制后核对不上：源文件夹 {0} 个文件 / {1}，新位置 {2} 个 / {3}。\n旧数据一个都没删，请检查新位置是否可写。",
+                        f1, RecordCleaner.Size(b1), f2, RecordCleaner.Size(b2));
+                    return false;
+                }
+
+                // 核对通过才动旧目录。删不干净（有文件被占用）不算失败 ——
+                // 数据已经安全落到新位置了，只是垃圾留到下次启动再扫。
+                if (IsDeletableDataDir(from))
+                {
+                    string err;
+                    if (!TryDeleteDataDir(from, out err)) { QueueRemoval(from); leftover = from; }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 删掉数据文件夹本身，不只是里面的文件。
+        ///
+        /// 逐项删而不是 <c>Directory.Delete(recursive)</c>：一把梭遇到一个被占用的文件就整段停下，
+        /// 结果就是「删了一半、文件夹还在」，用户以为删干净了。
+        /// 只有目录真的消失才返回 true。
+        /// </summary>
+        public static bool TryDeleteDataDir(string dir, out string err)
+        {
+            err = null;
+            if (!IsDeletableDataDir(dir)) { err = L10n.T("这个目录看起来不像是本程序的数据文件夹。"); return false; }
+
+            try
+            {
+                foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                {
+                    try { File.SetAttributes(f, FileAttributes.Normal); } catch { }
+                    try { File.Delete(f); }
+                    catch (Exception ex) { if (err == null) err = Path.GetFileName(f) + " — " + ex.Message; }
+                }
+
+                // 从最深的开始删空目录
+                var subs = Directory.GetDirectories(dir, "*", SearchOption.AllDirectories)
+                    .OrderByDescending(d => d.Length)
+                    .ToList();
+                foreach (var d in subs) { try { Directory.Delete(d, true); } catch { } }
+
+                try { Directory.Delete(dir, true); }
+                catch (Exception ex) { if (err == null) err = ex.Message; }
+            }
+            catch (Exception ex)
+            {
+                if (err == null) err = ex.Message;
+            }
+
+            return !Directory.Exists(dir);
+        }
+
+        // ---------------- 「下次启动再删」清单 ----------------
+        //
+        // 有些文件（缩略图、正在被别的程序扫描的台账）在程序运行时删不掉。
+        // 与其骗用户「删完了」，不如记下来，下次启动第一件事处理 ——
+        // 那时还没有任何句柄，一定删得掉。
+
+        public static string RemovalQueuePath
+        {
+            get { return Path.Combine(PointerDir, "pending-remove.txt"); }
+        }
+
+        public static void QueueRemoval(string dir)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dir)) return;
+                Directory.CreateDirectory(PointerDir);
+
+                var lines = new List<string>();
+                if (File.Exists(RemovalQueuePath)) lines.AddRange(File.ReadAllLines(RemovalQueuePath, Encoding.UTF8));
+                if (lines.Any(l => string.Equals(l.Trim(), dir, StringComparison.OrdinalIgnoreCase))) return;
+                lines.Add(dir);
+                File.WriteAllLines(RemovalQueuePath, lines.ToArray(), new UTF8Encoding(false));
+            }
+            catch { }
+        }
+
+        /// <summary>启动时调用：把上次没删干净的旧数据文件夹补删一次。</summary>
+        public static void ProcessRemovalQueue()
+        {
+            try
+            {
+                if (!File.Exists(RemovalQueuePath)) return;
+
+                var left = new List<string>();
+                foreach (var raw in File.ReadAllLines(RemovalQueuePath, Encoding.UTF8))
+                {
+                    var dir = raw.Trim();
+                    if (dir.Length == 0 || dir.StartsWith("#")) continue;
+                    if (!Directory.Exists(dir)) continue;
+
+                    // 绝不能删正在用的那个
+                    string cur = null;
+                    try { cur = AppPaths.DataDir; } catch { }
+                    if (!string.IsNullOrEmpty(cur) &&
+                        string.Equals(dir.TrimEnd('\\', '/'), cur.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string err;
+                    if (!TryDeleteDataDir(dir, out err)) left.Add(dir);
+                }
+
+                if (left.Count == 0) File.Delete(RemovalQueuePath);
+                else File.WriteAllLines(RemovalQueuePath, left.ToArray(), new UTF8Encoding(false));
+            }
+            catch { }
         }
     }
 }

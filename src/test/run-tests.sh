@@ -321,6 +321,126 @@ env -u NIKKI_TOOL_ROOT NIKKI_POINTER_DIR="$(cygpath -w "$EQ/ptr")" NIKKI_LANG=zh
 
 rm -rf "$EQ"
 
+# 下面几条要读写数据目录，重新指向隔离根目录
+export NIKKI_TOOL_ROOT="$ROOT"
+
+echo
+echo "========== 23. 标记是标签，不是状态 =========="
+# P1 回到相册，成为「在册」；给它打忽略标记，判定不能跟着变成「已忽略」
+cp "$SAMPLE" "$AL/$P1" 2>/dev/null
+run scan "$SS" > /dev/null
+M3=$(run ignore "$SS" "$P1")
+echo "$M3" | sed 's/^/  /'
+grep -q "判定=在册" <<< "$M3" \
+  && echo "  [OK] 打了忽略标记，判定仍然是「在册」" \
+  || { echo "  [FAIL] 标记把判定覆盖掉了（这正是 1.1 的毛病）"; FAIL=1; }
+grep -q "标记=已忽略" <<< "$M3" \
+  && echo "  [OK] 标记列写的是「已忽略」" \
+  || { echo "  [FAIL] 标记没有独立记录"; FAIL=1; }
+grep -q "显示=已忽略" <<< "$M3" \
+  && echo "  [OK] 显示状态确实是「已忽略」" \
+  || { echo "  [FAIL] 显示状态没跟上标记"; FAIL=1; }
+
+M4=$(run unignore "$SS" "$P1")
+echo "$M4" | sed 's/^/  /'
+grep -q "判定=在册" <<< "$M4" \
+  && echo "  [OK] 取消标记后判定仍是「在册」" \
+  || { echo "  [FAIL] 判定被改坏了"; FAIL=1; }
+grep -q "显示=在册" <<< "$M4" \
+  && echo "  [OK] 取消标记后直接回到「在册」，不是「已删除」（这是 1.2 的毛病）" \
+  || { echo "  [FAIL] 取消标记后落到了错误的状态"; FAIL=1; }
+
+echo
+echo "========== 24. 待清理文件夹：能看到、能挑着移回 =========="
+rm -rf "$PEND"                    # 清掉前面用例留下的东西，从干净状态开始
+rm -f "$AL/$P3"
+run scan "$SS" > /dev/null
+cp "$SAMPLE" "$SS/$P4" 2>/dev/null
+run pick "$SS" "$P3" "$P4" > /dev/null
+OUTP=$(run pending "$SS")
+echo "$OUTP" | sed 's/^/  /'
+grep -q "张数=2" <<< "$OUTP" \
+  && echo "  [OK] 待清理视图能列出这 2 张" \
+  || { echo "  [FAIL] 待清理列表是空的（用户反馈的「看不到」）"; FAIL=1; }
+
+MV1=$(run moveback "$SS" "$P3")
+echo "$MV1" | sed 's/^/  /'
+grep -q "移回=1 跳过=0" <<< "$MV1" \
+  && echo "  [OK] 只移回勾选的那一张" \
+  || { echo "  [FAIL] 移回张数不对"; FAIL=1; }
+grep -q "剩余待清理=1" <<< "$MV1" \
+  && echo "  [OK] 没勾的那张还留在待清理文件夹" \
+  || { echo "  [FAIL] 没勾的被一起搬走了"; FAIL=1; }
+
+MV2=$(run moveback "$SS")
+echo "$MV2" | sed 's/^/  /'
+grep -q "剩余待清理=0" <<< "$MV2" \
+  && echo "  [OK] 全部移回后待清理文件夹空了" \
+  || { echo "  [FAIL] 还有残留"; FAIL=1; }
+# 记录里可能还留着前面用例的旧条目（文件早就不在了，还原时会被跳过），
+# 所以这里断言的是「刚移回的这两张已经从记录里划掉」，而不是整份文件消失
+if [ -f "$DATA/最近一次移动记录.txt" ]; then
+  if grep -q "MOVE.*_1000004" "$DATA/最近一次移动记录.txt"; then
+    echo "  [FAIL] 刚移回的照片还留在记录里，下次会重复搬"; FAIL=1
+  else
+    echo "  [OK] 刚移回的照片已从记录里划掉，不会重复搬"
+  fi
+else
+  echo "  [OK] 记录已全部结清，文件也删了"
+fi
+
+echo
+echo "========== 25. 移回时原目录已有同一张：跳过，不制造副本 =========="
+rm -f "$SS"/*_还原*               # 第 4 步制造的副本会干扰计数，先清掉
+cp "$SAMPLE" "$SS/$P2" 2>/dev/null
+run pick "$SS" "$P2" > /dev/null
+cp "$SAMPLE" "$SS/$P2"          # 同大小同名的副本放回截图目录
+mv3=$(run moveback "$SS" "$P2")
+echo "$mv3" | sed 's/^/  /'
+grep -q "跳过=1" <<< "$mv3" \
+  && echo "  [OK] 认出原目录里已有同一张，跳过而不是改名搬一份" \
+  || { echo "  [FAIL] 又多造了一个副本"; FAIL=1; }
+ls -1 "$SS" | grep -c "_还原" | grep -q "^0$" \
+  && echo "  [OK] 没有生成「_还原」副本" \
+  || { echo "  [FAIL] 生成了 _还原 副本"; FAIL=1; }
+
+echo
+echo "========== 26. 删除使用数据：文件夹本身也要消失 =========="
+touch "$DATA/占位.txt"
+echo "  删之前：$(ls -1 "$DATA" | wc -l) 个条目"
+OUTD=$(run deltada)
+echo "$OUTD" | sed 's/^/  /'
+grep -q "删除成功=1" <<< "$OUTD" \
+  && echo "  [OK] 删除返回成功" \
+  || { echo "  [FAIL] 删除失败"; FAIL=1; }
+[ -d "$DATA" ] \
+  && { echo "  [FAIL] 文件夹还留着（用户反馈的「删不干净」）"; FAIL=1; } \
+  || echo "  [OK] 文件夹本身也没了，不只是清空内容"
+
+echo
+echo "========== 27. 更改位置：复制 → 核对 → 旧目录必须删掉 =========="
+mkdir -p "$DATA"
+echo "台账占位" > "$DATA/相册台账.tsv"
+NEWHOME="$(pwd)/_tmp_newhome"
+rm -rf "$NEWHOME"
+mkdir -p "$NEWHOME"
+OUTM=$(run movedata "$(cygpath -w "$NEWHOME")")
+echo "$OUTM" | sed 's/^/  /'
+grep -q "结果=成功" <<< "$OUTM" \
+  && echo "  [OK] 搬移成功" \
+  || { echo "  [FAIL] 搬移失败"; FAIL=1; }
+grep -q "旧目录还在=0" <<< "$OUTM" \
+  && echo "  [OK] 旧文件夹已经删掉（不再原地留一份）" \
+  || { echo "  [FAIL] 旧文件夹还留着（用户反馈的「复制而非移动」）"; FAIL=1; }
+grep -q "新目录存在=1" <<< "$OUTM" \
+  && echo "  [OK] 数据确实落在新位置" \
+  || { echo "  [FAIL] 新位置没东西"; FAIL=1; }
+grep -q "待删清单=无" <<< "$OUTM" \
+  && echo "  [OK] 没有需要下次补删的残留" \
+  || { echo "  [FAIL] 居然还有删不掉的残留"; FAIL=1; }
+
+rm -rf "$NEWHOME"
+
 echo
 echo "全部用例执行完毕。测试目录：$ROOT 与 $TAG"
 exit $FAIL

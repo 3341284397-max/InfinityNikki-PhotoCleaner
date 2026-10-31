@@ -436,18 +436,20 @@ namespace NikkiPhotoCleaner
         private readonly bool _en;
 
         private Panel _foot;
-        private SoftButton _btnClose, _btnMove, _btnDelete, _btnPurge;
+        private SoftButton _btnClose, _btnMove, _btnDelete;
         private Label _lblWhere;
+        private readonly string _screenShot;
 
         private int S(int v) { return (int)Math.Round(v * _scale); }
 
         /// <summary>做过删除/搬移之后置位，主窗口据此决定要不要重扫。</summary>
         public bool Changed { get; private set; }
 
-        public DataLocationDialog()
+        public DataLocationDialog(string screenShot = null)
         {
             _scale = DeviceDpi / 96f;
             _en = L10n.IsEnglish;
+            _screenShot = screenShot;
 
             Text = L10n.T("使用数据");
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -478,7 +480,8 @@ namespace NikkiPhotoCleaner
             var title = L10n.T("使用数据");
             var sub = L10n.T("台账、你标过的「忽略」、设置和缩略图缓存都在这个文件夹里。"
                            + "照片本身不在里面 —— 只有你主动移进来的「待清理照片」是例外。"
-                           + "这个程序没有安装过程，删掉 exe 就不留东西了，但数据文件夹要单独清理。");
+                           + "没有安装过程就没有卸载程序：删掉 exe 之后，"
+                           + "这里这个文件夹和 %APPDATA% 里那条位置记录，都要在这里清掉。");
 
             var subH = TextRenderer.MeasureText(sub, Theme.F(8.6f), new Size(innerW, 0),
                 TextFormatFlags.WordBreak).Height;
@@ -580,18 +583,19 @@ namespace NikkiPhotoCleaner
             };
 
             _btnMove = new SoftButton(L10n.T("更改位置…"), BtnKind.Ghost, S(104));
-            _btnDelete = new SoftButton(L10n.T("删除使用数据…"), BtnKind.Danger, S(120));
-            _btnPurge = new SoftButton(L10n.T("彻底卸载…"), BtnKind.Danger, S(104));
+            // 「删除使用数据」和「彻底卸载」做的是同一件事，留两个按钮只会让人以为不一样：
+            // 删掉数据却留着「数据放在哪」这条记录，重启后原地又长回来，那就不叫删干净。
+            // 所以合成一个，连位置记录一起清掉，重启会重新问你要放哪 —— 这也是最直观的证据。
+            _btnDelete = new SoftButton(L10n.T("删除使用数据…"), BtnKind.Danger, S(132));
             _btnClose = new SoftButton(L10n.T("关闭"), BtnKind.Primary, S(80));
 
             _btnMove.Click += (s, e) => MoveElsewhere();
             _btnDelete.Click += (s, e) => DeleteData();
-            _btnPurge.Click += (s, e) => PurgeAll();
             _btnClose.Click += (s, e) => { DialogResult = DialogResult.OK; Close(); };
 
-            foreach (var b in new Control[] { _btnMove, _btnDelete, _btnPurge, _btnClose })
+            foreach (var b in new Control[] { _btnMove, _btnDelete, _btnClose })
             {
-                // 多给一点内边距再重算宽度：中文「彻底卸载…」和英文「Uninstall…」
+                // 多给一点内边距再重算宽度：中文「删除使用数据…」和英文「Delete app data…」
                 // 都会把省略号顶到边框上，看起来像被切掉
                 var sb = b as SoftButton;
                 if (sb != null) { sb.PadX = 16; sb.FitWidth(); }
@@ -627,8 +631,6 @@ namespace NikkiPhotoCleaner
             _btnMove.SetBounds(x, y, _btnMove.Width, btnH);
             x += _btnMove.Width + gap;
             _btnDelete.SetBounds(x, y, _btnDelete.Width, btnH);
-            x += _btnDelete.Width + gap;
-            _btnPurge.SetBounds(x, y, _btnPurge.Width, btnH);
         }
 
         private static void OpenFolder(string dir)
@@ -641,13 +643,16 @@ namespace NikkiPhotoCleaner
             catch { }
         }
 
-        /// <summary>把现有数据复制到新位置，然后记住新位置。需要重启才生效。</summary>
+        /// <summary>
+        /// 把现有数据搬到新位置。
+        /// 复制 → 核对 → 删旧，三步都做完才算成功；旧目录删不掉会登记到待删清单。
+        /// </summary>
         private void MoveElsewhere()
         {
             string baseDir;
             using (var fbd = new FolderBrowserDialog())
             {
-                fbd.Description = L10n.T("选一个文件夹，数据文件夹会被复制进去");
+                fbd.Description = L10n.T("选一个文件夹，数据文件夹会被搬进去");
                 fbd.ShowNewFolderButton = true;
                 try { fbd.SelectedPath = AppPaths.ToolRoot; } catch { }
                 if (fbd.ShowDialog(this) != DialogResult.OK) return;
@@ -662,16 +667,20 @@ namespace NikkiPhotoCleaner
                 if (string.Equals(Path.GetFullPath(baseDir).TrimEnd('\\', '/'),
                                   Path.GetFullPath(cur).TrimEnd('\\', '/'),
                                   StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show(this, L10n.T("新位置和现在的位置是同一个地方。"),
+                        L10n.T("没动"), MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
+                }
             }
             catch { }
 
-            var dst = DataLocation.DataPathIn(baseDir, AppPaths.DataIsEnglish);
+            var dst = DataLocation.DataPathFor(baseDir, AppPaths.DataIsEnglish);
             if (string.IsNullOrEmpty(dst)) return;
 
-            if (!FirstRunDialog.CanWrite(dst))
+            if (!FirstRunDialog.CanWrite(baseDir))
             {
-                MessageBox.Show(this, L10n.F("这个位置写不进去：\n{0}", dst),
+                MessageBox.Show(this, L10n.F("这个位置写不进去：\n{0}", baseDir),
                     L10n.T("换个位置"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -688,23 +697,42 @@ namespace NikkiPhotoCleaner
                 return;
             }
 
+            int copied;
+            string err, leftover;
             Cursor = Cursors.WaitCursor;
-            var copied = DataLocation.CopyDir(AppPaths.DataDir, dst);
+            UseWaitCursor = true;
+            Application.DoEvents();
+            var ok = DataLocation.MoveDataTo(baseDir, out copied, out err, out leftover);
+            UseWaitCursor = false;
             Cursor = Cursors.Default;
+
+            if (!ok)
+            {
+                MessageBox.Show(this, err, L10n.T("没有搬成"), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             DataLocation.TryRemember(baseDir);
             AppPaths.Rebind();
             Changed = true;
 
-            var r = MessageBox.Show(this,
-                L10n.F("已经把 {0} 个文件复制到：\n{1}\n\n"
-                     + "重启程序后生效（这次运行还读旧位置）。现在重启吗？", copied, dst),
-                L10n.T("复制完成"), MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            var msg = L10n.F("已经把 {0} 个文件搬到：\n{1}", copied, dst);
+            if (leftover != null)
+                msg += "\n\n" + L10n.F("旧文件夹还有东西被别的程序占着，暂时没删掉：\n{0}\n"
+                                     + "已经记下来了，下次启动会先把它删干净。", leftover);
+            else
+                msg += "\n\n" + L10n.T("旧文件夹已经删掉了，现在只剩这一份，两边的台账不会再打架。");
 
-            if (r == DialogResult.Yes) Restart();
+            MessageBox.Show(this, msg, L10n.T("搬完了"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
-        /// <summary>只删数据文件夹，不碰待清理文件夹里的照片。</summary>
+        /// <summary>
+        /// 删掉数据文件夹（连文件夹本身），并把「数据放在哪」这条记录一起清掉，然后退出程序。
+        ///
+        /// 为什么必须退出：文件被自己占着就删不干净。1.8 的版本删完之后主窗口又扫了一次，
+        /// 扫描第一件事就是写台账，于是文件夹原地重建、只剩一份空台账 ——
+        /// 用户看到的「删不干净」就是这么来的。
+        /// </summary>
         private void DeleteData()
         {
             var dir = AppPaths.DataDir;
@@ -718,14 +746,16 @@ namespace NikkiPhotoCleaner
             int files; long bytes;
             DataLocation.Measure(dir, out files, out bytes);
 
-            var pending = Path.Combine(AppPaths.ToolRoot, AppPaths.PendingFolderName);
+            var pendingDir = string.IsNullOrEmpty(_screenShot)
+                ? Path.Combine(AppPaths.ToolRoot, AppPaths.PendingFolderName)
+                : Mover.PendingDir(_screenShot);
             int photos = 0;
-            try { if (Directory.Exists(pending)) photos = Directory.GetFiles(pending).Length; } catch { }
+            try { if (Directory.Exists(pendingDir)) photos = Directory.GetFiles(pendingDir).Length; } catch { }
 
             var msg = L10n.F("要删掉这个文件夹吗？\n\n{0}\n\n"
-                           + "里面有 {1} 个文件，共 {2}。\n"
-                           + "台账、你标过的「忽略」、设置都会一起消失，删了找不回来。\n\n"
-                           + "照片本身不受影响。",
+                           + "里面有 {1} 个文件，共 {2}。整个文件夹会被删掉 —— "
+                           + "台账、你标过的「忽略」、设置、缩略图缓存都会消失。\n\n"
+                           + "照片本身不受影响。删完程序会退出；下次启动会重新问你要把数据放在哪。",
                              dir, files, RecordCleaner.Size(bytes));
             if (photos > 0)
                 msg += L10n.F("\n\n待清理文件夹里还有 {0} 张照片，那是你的照片，这里不会动它。", photos);
@@ -734,86 +764,31 @@ namespace NikkiPhotoCleaner
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
             if (r != DialogResult.Yes) return;
 
-            if (!TryDelete(dir, out var err))
-            {
-                MessageBox.Show(this, L10n.F("删除失败：\n{0}\n\n（照片还在用这个文件夹吗？关掉看图软件再试。）", err),
-                    L10n.T("没删掉"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            Changed = true;
-            MessageBox.Show(this,
-                L10n.T("已经删掉了。下次扫描会重新建一份干净的数据 —— 第一次扫描不会判出「已删除」，这是正常的。"),
-                L10n.T("删除完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        /// <summary>删数据 + 删「位置」记录，等于回到刚下载的状态。</summary>
-        private void PurgeAll()
-        {
-            var dir = AppPaths.DataDir;
-            int files; long bytes;
-            DataLocation.Measure(dir, out files, out bytes);
-
-            var pending = Path.Combine(AppPaths.ToolRoot, AppPaths.PendingFolderName);
-            int photos = 0;
-            try { if (Directory.Exists(pending)) photos = Directory.GetFiles(pending).Length; } catch { }
-
-            var msg = L10n.F("彻底卸载＝把程序留下的东西清干净：\n\n"
-                           + "① 删掉数据文件夹 {0}（{1} 个文件，共 {2}）\n"
-                           + "② 删掉 %APPDATA% 里那条「数据放在哪」的记录\n"
-                           + "③ 程序自己退出，之后你直接删掉 exe 就行\n\n"
-                           + "删完找不回来。照片本身不受影响。",
-                             dir, files, RecordCleaner.Size(bytes));
-            if (photos > 0)
-                msg += L10n.F("\n\n注意：待清理文件夹里还有 {0} 张照片，这里不会动 —— "
-                            + "那是你的照片，要删请自己确认后再删。", photos);
-
-            var r = MessageBox.Show(this, msg, L10n.T("确认彻底卸载"),
-                MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
-            if (r != DialogResult.Yes) return;
-
             string err;
-            if (DataLocation.IsDeletableDataDir(dir) && !TryDelete(dir, out err))
-            {
-                MessageBox.Show(this, L10n.F("数据文件夹没删掉：\n{0}", err),
-                    L10n.T("没删干净"), MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
+            var gone = DataLocation.TryDeleteDataDir(dir, out err);
 
+            // 位置记录一定要清：留着它，下次启动就会在同一个地方重建一份，
+            // 用户从外观上分不出「删过」和「没删过」。
             DataLocation.TryNotRemember();
 
-            var tail = photos > 0
-                ? L10n.F("\n\n还有一件事：待清理文件夹（{0}）里那 {1} 张照片没动，自己看一眼再删。", pending, photos)
-                : "\n\n" + L10n.T("现在可以直接删掉 exe 了 —— 没有安装过程，也就没有卸载程序，删掉文件就是卸载干净。");
-
-            MessageBox.Show(this, L10n.T("已经清理干净。") + tail,
-                L10n.T("卸载完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-            Application.Exit();
-        }
-
-        private static bool TryDelete(string dir, out string err)
-        {
-            err = null;
-            try
+            if (!gone)
             {
-                Directory.Delete(dir, true);
-                return true;
+                // 还有文件被占用：先登记，退出后再删。此时把「删除失败」说成失败，
+                // 但实际上下次启动就会补掉，所以要把这句话讲清楚。
+                DataLocation.QueueRemoval(dir);
+                MessageBox.Show(this,
+                    L10n.F("还有文件正在被占用，这次没删完：\n{0}\n\n"
+                         + "已经记下来了。程序这就退出，下次启动会先把剩下的删干净。", err),
+                    L10n.T("没删干净"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
-            catch (Exception ex)
+            else
             {
-                err = ex.Message;
-                return false;
+                MessageBox.Show(this,
+                    L10n.T("已经删干净了，文件夹本身也没留下。\n\n"
+                         + "程序现在退出。下次启动会重新问你要把数据放在哪 —— 这就是删成功的证明。"),
+                    L10n.T("删除完成"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-        }
 
-        private static void Restart()
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo(Application.ExecutablePath) { UseShellExecute = true });
-            }
-            catch { }
             Application.Exit();
         }
     }

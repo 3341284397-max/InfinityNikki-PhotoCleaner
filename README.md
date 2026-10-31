@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 
 **[→ Try it online](https://3341284397-max.github.io/InfinityNikki-PhotoCleaner/)**　·　**[↓ Download the exe](https://github.com/3341284397-max/InfinityNikki-PhotoCleaner/releases/latest/download/NikkiPhotoCleaner.exe)**　·　the web version installs nothing — pick a folder and go.
 
-**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.8.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
+**In China and GitHub is slow?** This repo is mirrored on Gitee: [gitee.com/lyrins/InfinityNikki-PhotoCleaner](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner) — [download the exe there](https://gitee.com/lyrins/InfinityNikki-PhotoCleaner/releases/download/v1.9.0/NikkiPhotoCleaner.exe) (direct link, no login needed).
 
 A third option: [Baidu Wangpan](https://pan.baidu.com/s/15jaYZvAnNP8VuFZwOQsp2w) — code `1111`. It holds the full bundle (exe + Chinese readme + screenshots + the dependency-free fallback), which is the one to use when neither code host is reachable.
 
@@ -29,15 +29,23 @@ moves them aside, and lets you press Delete yourself.
 
 ---
 
-## Five statuses
+## Four verdicts + two tags
 
-| Status | Meaning | Colour |
+A **verdict** is what the program concluded; a **tag** is something stuck onto the photo.
+They are **two columns, not one thing**: the same photo can be judged "Deleted" and be tagged
+"Ignored" by you, and the list shows `Deleted` `Ignored` side by side.
+
+| Verdict | Meaning | Colour |
 |---|---|---|
 | **In album** | File name is still listed in the game's album cache; visible in game | green |
 | **Deleted** | Was seen in the album before, and is gone from the cache now | clay |
 | **Unsure** | Not in the album cache, and the tool has never seen it (old files, or first scan after install) | amber |
 | **Too new** | Would be Deleted/Unsure, but modified less than 3 days ago — recent screenshots are never auto-selected | grey |
-| **Ignored** | You tagged it "leave this alone". Excluded from ticking, counts and moving | light grey |
+
+| Tag | Set by | Meaning |
+|---|---|---|
+| **Ignored** | you | Leave this one alone. Excluded from ticking, counts and moving. Removable at any time |
+| **Imported** | the tool | The file was copied in, not taken by the game (creation time well after modification time) |
 
 Evidence comes from two places:
 
@@ -46,6 +54,10 @@ Evidence comes from two places:
 
 "Deleted" requires **both** conditions: was in the album, and is not any more.
 **Nothing is ever pre-ticked** — ticking is always your action, never the tool's.
+
+**A tag never rewrites the verdict.** Clear "Ignored" and the photo drops straight back to
+what it was (in album stays in album, too new stays too new) — no rescan, and it does not
+fall into "Deleted".
 
 ---
 
@@ -96,11 +108,30 @@ The test is not perfect: some copy tools, and moves on FAT32, preserve the creat
 
 ### Manual tags: when the program cannot be sure
 
-"Ignore" in the toolbar is the final say. Ignored photos leave ticking, counts and moving entirely; "Un-ignore" puts them back at any time.
+"Ignore" in the toolbar is the final say. Tagged photos get an extra **"Ignored" tag** — the verdict stays exactly as it was, and the list shows both side by side (`Deleted` `Ignored`). They leave ticking, counts and moving entirely; "Un-ignore" removes the tag and the photo returns to its original verdict at once, with no rescan.
 
 Tags live in `user-marks.tsv`, deliberately separate from the ledger — the ledger is *what the program observed* (safe to delete and rebuild), tags are *what you said* (only you change them). The key is **file name + size**: same name with a different size means a different photo on disk, and the old tag does not apply. The direction is intentional — better to miss one ignore than to ignore a photo that should have been cleaned.
 
 Before every change the previous version is kept as `user-marks.tsv.bak`.
+
+### The review folder: things you moved out can come back
+
+Two pills above the list — `Screenshots` and `Review` — switch which folder you are looking at.
+The review view reuses **the same list and the same preview pane**, fed from
+`NikkiCleaner_ToDelete`:
+
+- Every moved-out photo is visible, can be enlarged with a double click, and can be ticked
+- Once ticked, the primary button at the bottom turns into "Restore (N)" and moves them back **one by one**
+- A file already present in the screenshot folder with the same name and size is skipped,
+  not duplicated; same name but different content gets renamed so both survive
+- Each restore is crossed off the move record, so the older batch-restore button never moves it twice
+- The review folder is deleted automatically once it is empty — no empty shell left in `ScreenShot`
+
+There is no verdict and no tag to set in this view (the photos are no longer in the screenshot
+folder), so the tagging buttons are greyed out on purpose.
+
+![Review-folder view](docs/screenshots/pending-en.png)
+
 
 ### What this program never does
 
@@ -281,18 +312,28 @@ If both exist (an upgraded install), the Chinese one wins.
 
 Three things live behind **Data location** in the top-right corner:
 
-- **Move** — copies the current data to a new location, effective after a restart.
+- **Move** — copies to the new location, **verifies file count and total bytes**, then deletes the old
+  folder. If the check fails, nothing is deleted — better to fail than to leave you with half the data.
+  Anything still held open by another program is queued and removed on the next launch.
   Existing files are never overwritten, and a location that already holds a data folder is refused,
   because merging two ledgers would scramble the "deleted in game" verdicts
-- **Delete app data** — removes only the app's own folder (ledger, tags, settings, cache).
-  Photos are untouched; if the review folder still holds some, you are told
-- **Uninstall** — deletes the data and the `location.txt` record, then exits
+- **Delete app data** — removes the folder **entirely** (the folder itself, not just its contents),
+  clears the `location.txt` record, and **exits the app**. The next launch asks where to keep data
+  again — that is your proof it worked. Photos are untouched; if the review folder still holds
+  some, you are told
 
 ![Data location](docs/screenshots/data-manage-en.png)
 
-There is no installer, so there is **no uninstaller**: deleting the exe is the uninstall,
-but the data folder stays behind. Three places to clean: the data folder, the review folder,
-and `%APPDATA%\NikkiPhotoCleaner\location.txt`.
+Why deleting data has to exit the app: files held open by the running process never come off
+cleanly. Older builds deleted the folder and then rescanned, and the rescan's very first act was
+writing the ledger — so the folder reappeared holding nothing but an empty ledger, which looked
+like "deleted, but not really".
+
+There is no installer, so there is **no uninstaller**. Two ways to clean up completely:
+
+1. Click **Delete app data** (removes the folder and the location record, then exits), then delete the exe
+2. Delete three things by hand: the data folder, the review folder, and
+   `%APPDATA%\NikkiPhotoCleaner\location.txt`
 Forgot where your data went? Run the exe once and open **Data location** — it shows the full path.
 
 ---
@@ -319,7 +360,7 @@ dotnet build -c Release
 ```
 src/app/        C# WinForms sources (Program.cs / DataLocation.cs / DataDialogs.cs / Theme.cs / L10n.cs / Config.cs / RecordCleaner.cs)
 src/scripts/    Zero-dependency PowerShell version (lang/PhotoSync.en.ps1 holds the English strings)
-src/test/       Regression host (net8); run-tests.sh covers 22 cases
+src/test/       Regression host (net8); run-tests.sh covers 27 cases
 web/            Static web version (index.html / styles.css / app.js)
 package/        Four double-click .bat launchers, in Chinese and English
 src/pack/       Builds the share package for cloud drives (exe + 使用说明.txt + screenshots)
@@ -332,11 +373,14 @@ docs/           Screenshots
 cd src/test && ./run-tests.sh
 ```
 
-Covers the status state machine, the "too new" threshold, ledger I/O, move and restore, record cleanup,
-that switching language never splits the data folder (cases 12 and 13), imported-photo detection and tag
-persistence (14–16), that a same-name/different-size file invalidates its ledger entry (17),
+27 cases. Covers the verdict state machine, the "too new" threshold, ledger I/O, move and restore,
+record cleanup, that switching language never splits the data folder (12, 13), imported-photo detection
+and tag persistence (14–16), that a same-name/different-size file invalidates its ledger entry (17),
 the stored data-location record and its fallback when stale (18–20), the game-sibling path derivation (21),
-and an end-to-end run proving the data does not land back next to the exe (22).
+an end-to-end run proving the data does not land back next to the exe (22),
+**a tag never rewriting the verdict** (23 — the 1.1 / 1.2 regression),
+the review view listing and selectively restoring (24), no duplicate copies on restore (25),
+the folder itself disappearing after "delete app data" (26), and the old folder being removed after a move (27).
 
 ## Known limitations
 

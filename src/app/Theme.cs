@@ -154,6 +154,9 @@ namespace NikkiPhotoCleaner
                 case StatusText.Ignored:
                     // 中性灰，比「太新」再淡一档：它代表「程序不再管这张了」，不该有任何情绪色
                     bg = LineSoft; fore = Text2; border = Line; return;
+                case StatusText.Pending:
+                    // 待清理视图里的那批：已经搬出截图目录，同样用中性色
+                    bg = CardSoft; fore = Text2; border = Line; return;
                 default:
                     bg = Color.FromArgb(0xF0, 0xF0, 0xEC);
                     fore = Text3;

@@ -27,7 +27,8 @@ namespace NikkiPhotoCleaner
 
                 case "shot":
                     // SAC 拦未签名 exe，用 dotnet 跑同一份 UI 代码出图
-                    UI(args[1], args.Length > 2 && args[2] == "demo");
+                    UI(args[1], args.Length > 2 && args[2] == "demo",
+                       args.Length > 3 && args[3] == "pending");
                     return 0;
 
                 case "dlg":
@@ -99,6 +100,26 @@ namespace NikkiPhotoCleaner
                     // sibling <截图目录>：验证「与游戏文件夹并列」那一级推导是否正确
                     Console.Write(DataLocation.SiblingOf(args.Length > 1 ? args[1] : null) ?? "(null)");
                     return 0;
+
+                case "pending":
+                    // pending <ss>：列出待清理文件夹里的照片，以及移回时会用的原名
+                    Console.Write(Pending(args[1]));
+                    return 0;
+
+                case "moveback":
+                    // moveback <ss> [name...]：把勾选的（或不给名字则全部）移回截图目录
+                    Console.Write(MoveBack(args[1], args.Skip(2).ToArray()));
+                    return 0;
+
+                case "movedata":
+                    // movedata <新父目录>：搬数据文件夹，验证「复制 → 核对 → 删旧」
+                    Console.Write(MoveData(args[1]));
+                    return 0;
+
+                case "deltada":
+                    // deltada：删数据文件夹本身，验证删完文件夹真的不见了
+                    Console.Write(DeleteData());
+                    return 0;
             }
 
             Console.WriteLine("未知命令: " + args[0]);
@@ -109,12 +130,12 @@ namespace NikkiPhotoCleaner
         /// 把主窗口渲染成 PNG。WinForms 要 STA，而 .NET 控制台主线程是 MTA，
         /// 所以另开一条 STA 线程跑整个界面生命周期。
         /// </summary>
-        private static void UI(string path, bool demo)
+        private static void UI(string path, bool demo, bool pending = false)
         {
             Exception err = null;
             var th = new System.Threading.Thread(() =>
             {
-                try { Program.RunShot(path, demo); }
+                try { Program.RunShot(path, demo, false, pending); }
                 catch (Exception ex) { err = ex; }
             });
             th.SetApartmentState(System.Threading.ApartmentState.STA);
@@ -228,7 +249,7 @@ namespace NikkiPhotoCleaner
             return sb.ToString();
         }
 
-        /// <summary>每张的状态 + 标记，末尾给一行汇总，方便脚本里 grep 断言。</summary>
+        /// <summary>每张的判定 + 标记，末尾给一行汇总，方便脚本里 grep 断言。</summary>
         private static string Tag(string ss)
         {
             var r = Scanner.Run(ss, 0);
@@ -239,14 +260,15 @@ namespace NikkiPhotoCleaner
                          : p.External ? "外部导入"
                          : p.Ignored ? "已忽略"
                          : "";
-                sb.AppendLine("  " + StatusText.Name(p.Status).PadRight(6) +
+                // 判定列永远报 BaseStatus：标记是另一栏的事，不能把它盖掉
+                sb.AppendLine("  " + StatusText.Name(p.BaseStatus).PadRight(6) +
                               p.Name + (tags.Length > 0 ? "  [" + tags + "]" : ""));
             }
-            sb.AppendLine("counts=InAlbum:" + r.Items.Count(p => p.Status == StatusText.InAlbum) +
-                          " Deleted:" + r.Items.Count(p => p.Status == StatusText.Deleted) +
-                          " Suspect:" + r.Items.Count(p => p.Status == StatusText.Suspect) +
-                          " TooNew:" + r.Items.Count(p => p.Status == StatusText.TooNew) +
-                          " Ignored:" + r.Items.Count(p => p.Status == StatusText.Ignored) +
+            sb.AppendLine("counts=InAlbum:" + r.Items.Count(p => p.BaseStatus == StatusText.InAlbum) +
+                          " Deleted:" + r.Items.Count(p => p.BaseStatus == StatusText.Deleted) +
+                          " Suspect:" + r.Items.Count(p => p.BaseStatus == StatusText.Suspect) +
+                          " TooNew:" + r.Items.Count(p => p.BaseStatus == StatusText.TooNew) +
+                          " Ignored:" + r.Items.Count(p => p.Ignored) +
                           " External:" + r.Items.Count(p => p.External) +
                           " Excluded:" + r.Items.Count(p => p.Excluded) +
                           " Marks:" + (r.Marks == null ? 0 : r.Marks.Count));
@@ -268,7 +290,19 @@ namespace NikkiPhotoCleaner
             var after = Scanner.Run(ss, 0);
             var sb = new StringBuilder();
             sb.AppendLine("操作=" + (on ? "标记忽略" : "取消忽略") + " 命中=" + targets.Count);
-            sb.AppendLine("Ignored=" + after.Items.Count(p => p.Status == StatusText.Ignored) +
+
+            // 这一行是本次修复的核心：标记前后「判定」都不该变，只有「标记」变
+            foreach (var t in targets)
+            {
+                var a = after.Items.FirstOrDefault(x => string.Equals(x.Name, t.Name, StringComparison.OrdinalIgnoreCase));
+                sb.AppendLine("  " + t.Name +
+                              " 判定=" + StatusText.Name(t.BaseStatus) +
+                              (a == null ? " （扫描后不见了）"
+                                         : " 标记=" + (a.Ignored ? StatusText.Name(StatusText.Ignored) : "无") +
+                                           " 显示=" + StatusText.Name(a.Status)));
+            }
+
+            sb.AppendLine("Ignored=" + after.Items.Count(p => p.Ignored) +
                           " Marks=" + (after.Marks == null ? 0 : after.Marks.Count));
             sb.AppendLine("备份文件=" + (File.Exists(AppPaths.MarkPath + ".bak") ? "有" : "无"));
             return sb.ToString();
@@ -301,6 +335,75 @@ namespace NikkiPhotoCleaner
             sb.AppendLine("ToolRoot=" + AppPaths.ToolRoot);
             sb.AppendLine("DataDir=" + AppPaths.DataDir);
             sb.AppendLine("Ledger=" + AppPaths.LedgerPath);
+            return sb.ToString();
+        }
+
+        /// <summary>待清理文件夹里有什么，以及移回时会用哪个名字。</summary>
+        private static string Pending(string ss)
+        {
+            var list = Mover.ScanPending(ss);
+            var sb = new StringBuilder();
+            foreach (var p in list)
+                sb.AppendLine("  " + p.Name + "  原名=" + p.OriginalName +
+                              (string.Equals(p.Name, p.OriginalName, StringComparison.OrdinalIgnoreCase) ? "（未改名）" : "（改过名）"));
+            sb.AppendLine("张数=" + list.Count);
+            sb.AppendLine("目录=" + Mover.PendingDir(ss));
+            sb.AppendLine("目录存在=" + (Directory.Exists(Mover.PendingDir(ss)) ? "1" : "0"));
+            return sb.ToString();
+        }
+
+        private static string MoveBack(string ss, string[] names)
+        {
+            var all = Mover.ScanPending(ss);
+            var picked = names.Length == 0
+                ? all
+                : all.Where(p => names.Contains(p.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+
+            var r = Mover.RestoreSelected(picked, ss);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("勾选=" + picked.Count + " 移回=" + r.Ok +
+                          " 跳过=" + r.Skipped.Count + " 失败=" + r.Failed.Count);
+            foreach (var s in r.Skipped) sb.AppendLine("  跳过: " + s);
+            foreach (var s in r.Failed) sb.AppendLine("  失败: " + s);
+            sb.AppendLine("剩余待清理=" + Mover.ScanPending(ss).Count);
+            sb.AppendLine("ScreenShot张数=" + Directory.GetFiles(ss, "*.jpeg").Length);
+            sb.AppendLine("记录仍在=" + (File.Exists(AppPaths.LastMovePath) ? "1" : "0"));
+            return sb.ToString();
+        }
+
+        /// <summary>搬数据文件夹：复制 → 核对 → 删旧，并报告旧目录是否真的没了。</summary>
+        private static string MoveData(string newBase)
+        {
+            var old = AppPaths.DataDir;
+            int copied;
+            string err, leftover;
+            var ok = DataLocation.MoveDataTo(newBase, out copied, out err, out leftover);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("结果=" + (ok ? "成功" : "失败"));
+            sb.AppendLine("复制文件数=" + copied);
+            sb.AppendLine("旧目录=" + old);
+            sb.AppendLine("旧目录还在=" + (Directory.Exists(old) ? "1" : "0"));
+            sb.AppendLine("新目录=" + DataLocation.DataPathFor(newBase, AppPaths.DataIsEnglish));
+            sb.AppendLine("新目录存在=" + (Directory.Exists(DataLocation.DataPathFor(newBase, AppPaths.DataIsEnglish)) ? "1" : "0"));
+            sb.AppendLine("待删清单=" + (File.Exists(DataLocation.RemovalQueuePath) ? "有" : "无"));
+            if (leftover != null) sb.AppendLine("残留=" + leftover);
+            if (err != null) sb.AppendLine("错误=" + err);
+            return sb.ToString();
+        }
+
+        private static string DeleteData()
+        {
+            var dir = AppPaths.DataDir;
+            string err;
+            var gone = DataLocation.TryDeleteDataDir(dir, out err);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("目标=" + dir);
+            sb.AppendLine("删除成功=" + (gone ? "1" : "0"));
+            sb.AppendLine("目录还在=" + (Directory.Exists(dir) ? "1" : "0"));
+            if (err != null) sb.AppendLine("错误=" + err);
             return sb.ToString();
         }
     }
